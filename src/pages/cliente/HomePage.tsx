@@ -232,6 +232,64 @@ export function HomePage() {
             </div>
           )}
 
+          {/* Pedido en vuelo */}
+          {tienePedido && (() => {
+            const pedido = datos.pedidos.find(p => p.estado !== 'completado' && p.estado !== 'cancelado')
+            if (!pedido) return null
+            return (
+              <div className="card fade-in" onClick={() => navigate(`/cliente/${id}/pedidos`)}
+                style={{ border: '1px solid var(--color-blue-mid)', background: 'var(--color-blue-light)', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-blue-dark)', marginBottom: 3 }}>📦 Pedido en vuelo</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)' }}>{pedido.numero}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-blue-dark)', marginTop: 2 }}>{pedido.producto}</div>
+                  </div>
+                  <span className="pill pill-blue" style={{ fontSize: 9 }}>{pedido.estado.replace(/_/g, ' ')}</span>
+                </div>
+                {pedido.citaFecha && (
+                  <div style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 'var(--border-radius-md)', fontSize: 11, color: 'var(--color-blue-dark)', fontWeight: 600 }}>
+                    📅 Cita: {pedido.citaFecha} · {pedido.citaHora}
+                  </div>
+                )}
+                {!pedido.citaFecha && pedido.proximoHito && (
+                  <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                    Próximo hito: {pedido.proximoHito} · {pedido.fechaProximoHito}
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--color-blue-dark)', marginTop: 6, fontWeight: 600 }}>Ver detalle →</div>
+              </div>
+            )
+          })()}
+
+          {/* Avería activa */}
+          {tieneAveria && (() => {
+            const averia = datos.averias.find(a => a.estado !== 'resuelta')
+            if (!averia) return null
+            const bloqueada = averia.estado === 'bloqueada_impago'
+            return (
+              <div className="card fade-in" onClick={() => navigate(`/cliente/${id}/averias`)}
+                style={{ border: `1px solid ${bloqueada ? 'var(--color-red-border)' : 'var(--color-amber-border)'}`, background: bloqueada ? 'var(--color-red-light)' : 'var(--color-amber-light)', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginBottom: 3 }}>
+                      🔧 Avería {bloqueada ? 'bloqueada' : 'activa'}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)' }}>AV-{averia.numero}</div>
+                    <div style={{ fontSize: 11, color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginTop: 2 }}>{averia.sintoma}</div>
+                  </div>
+                  <span className={`pill ${bloqueada ? 'pill-err' : 'pill-warn'}`} style={{ fontSize: 9 }}>{averia.estado.replace(/_/g, ' ')}</span>
+                </div>
+                {bloqueada && (
+                  <div style={{ fontSize: 10, color: 'var(--color-red-dark)', fontWeight: 600 }}>
+                    ⚠ Bloqueada por impago — regularizar cobro primero
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginTop: 4, fontWeight: 600 }}>Ver avería →</div>
+              </div>
+            )
+          })()}
+
           {/* Representantes */}
           {datos.representantes.length > 0 && (
             <div className="card">

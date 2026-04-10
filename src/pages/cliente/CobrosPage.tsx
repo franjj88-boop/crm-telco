@@ -57,6 +57,8 @@ export function CobrosPage() {
   const [cuotas, setCuotas] = useState(3)
   const [preCheckVisible, setPreCheckVisible] = useState(true)
   const [historicoPagosVisible, setHistoricoPagosVisible] = useState(false)
+  const [vruTransferido, setVruTransferido] = useState(false)
+  const [vruResultado, setVruResultado] = useState<'pendiente' | 'ok' | 'fallido' | null>(null)
 
   if (!id) return null
   const datos = datosCliente[id]
@@ -512,6 +514,12 @@ export function CobrosPage() {
                         onClick={() => {
                           if (blq.bloqueada) return
                           if (a.id === 'fracc') { setMostrarFracc(!mostrarFracc); return }
+                          if (a.id === 'tarjeta') {
+                            setVruTransferido(true)
+                            setVruResultado('pendiente')
+                            setTimeout(() => setVruResultado(Math.random() > 0.3 ? 'ok' : 'fallido'), 4000)
+                            return
+                          }
                           ejecutar(a.label)
                         }}
                         disabled={blq.bloqueada || !!accionEn}
@@ -586,6 +594,37 @@ export function CobrosPage() {
                     style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
                     Confirmar {cuotas} cuotas de {factura ? (factura.importe / cuotas).toFixed(2) : '—'}€
                   </button>
+                </div>
+              )}
+
+              {/* Retorno VRU en tiempo real */}
+              {vruTransferido && (
+                <div className="fade-in" style={{ marginTop: 12, padding: '12px', borderRadius: 'var(--border-radius-md)', border: `1px solid ${vruResultado === 'ok' ? 'var(--color-green-border)' : vruResultado === 'fallido' ? 'var(--color-red-border)' : 'var(--color-blue-mid)'}`, background: vruResultado === 'ok' ? 'var(--color-green-light)' : vruResultado === 'fallido' ? 'var(--color-red-light)' : 'var(--color-blue-light)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: vruResultado === 'ok' ? 'var(--color-green-dark)' : vruResultado === 'fallido' ? 'var(--color-red-dark)' : 'var(--color-blue-dark)', marginBottom: 6 }}>
+                    {vruResultado === 'pendiente' && <><span className="spinner spinner-sm" style={{ marginRight: 6 }} />Esperando resultado del VRU de pago...</>}
+                    {vruResultado === 'ok' && '✓ Pago completado por VRU'}
+                    {vruResultado === 'fallido' && '✕ Pago fallido en VRU'}
+                  </div>
+                  {vruResultado === 'pendiente' && (
+                    <div style={{ fontSize: 10, color: 'var(--color-blue-dark)' }}>
+                      El cliente está en proceso de pago con tarjeta — resultado en tiempo real
+                    </div>
+                  )}
+                  {vruResultado === 'ok' && (
+                    <div style={{ fontSize: 11, color: 'var(--color-green-dark)' }}>
+                      Deuda saldada · El registro se actualizará en los próximos minutos
+                    </div>
+                  )}
+                  {vruResultado === 'fallido' && (
+                    <div style={{ fontSize: 11, color: 'var(--color-red-dark)' }}>
+                      El pago no se ha podido completar — ofrecer fraccionamiento o aplazamiento
+                    </div>
+                  )}
+                  {vruResultado !== 'pendiente' && (
+                    <button onClick={() => { setVruTransferido(false); setVruResultado(null) }} className="btn-ghost" style={{ fontSize: 10, marginTop: 8 }}>
+                      Reintentar
+                    </button>
+                  )}
                 </div>
               )}
             </div>

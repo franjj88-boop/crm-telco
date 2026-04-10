@@ -25,6 +25,11 @@ export function ClienteLayout() {
   const [mostrarNotas, setMostrarNotas] = useState(false)
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false)
   const [ivrAbierto, setIvrAbierto] = useState(true)
+  const [mostrarCierre, setMostrarCierre] = useState(false)
+  const [cierreMotivo, setCierreMotivo] = useState('')
+  const [cierreMotivoCode, setCierreMotivoCode] = useState<{ motivo: string; submotivo: string } | null>(null)
+  const [cierreResuelto, setCierreResuelto] = useState<boolean | null>(null)
+  const [cierreCerrando, setCierreCerrando] = useState(false)
 
   useEffect(() => {
     if (id && datosCliente[id]) {
@@ -136,6 +141,19 @@ export function ClienteLayout() {
 
   const tvInfo = getTVInfo()
 
+  const codificarMotivoCierre = (texto: string) => {
+    const t = texto.toLowerCase()
+    if (t.includes('roaming') || t.includes('cargo')) return { motivo: 'Reclamación económica', submotivo: 'Cargo en factura' }
+    if (t.includes('factura') || t.includes('importe')) return { motivo: 'Consulta facturación', submotivo: 'Consulta de factura' }
+    if (t.includes('avería') || t.includes('internet') || t.includes('fibra') || t.includes('conexión')) return { motivo: 'Avería técnica', submotivo: 'Sin conexión / Fibra' }
+    if (t.includes('cobro') || t.includes('deuda') || t.includes('pago')) return { motivo: 'Cobros', submotivo: 'Gestión de deuda' }
+    if (t.includes('promo') || t.includes('descuento') || t.includes('oferta')) return { motivo: 'Comercial', submotivo: 'Consulta de oferta / Promoción' }
+    if (t.includes('pedido') || t.includes('instalación') || t.includes('técnico')) return { motivo: 'Seguimiento pedido', submotivo: 'Estado de instalación' }
+    if (t.includes('baja') || t.includes('cancel')) return { motivo: 'Retención / Baja', submotivo: 'Solicitud de baja' }
+    if (t.includes('línea') || t.includes('móvil') || t.includes('sim')) return { motivo: 'Gestión de línea', submotivo: 'Consulta / Modificación línea móvil' }
+    return { motivo: 'Atención general', submotivo: 'Consulta sin clasificar' }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
 
@@ -207,7 +225,7 @@ export function ClienteLayout() {
           📝
         </button>
 
-        <button onClick={() => { finalizarLlamada(); navigate('/') }}
+        <button onClick={() => setMostrarCierre(true)}
           style={{ height: 26, padding: '0 10px', fontSize: 11, fontWeight: 600, background: 'none', border: '1px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
           Cerrar contacto
         </button>
@@ -507,6 +525,129 @@ export function ClienteLayout() {
           </div>
         </div>
       </div>
+
+      {/* ── MODAL CIERRE DE CONTACTO RF-09 ── */}
+      {mostrarCierre && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--color-background-primary)', borderRadius: 'var(--border-radius-lg)', boxShadow: 'var(--shadow-lg)', width: 480, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Cerrar contacto</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                {cliente.nombre} {cliente.apellidos} · {formatTiempo(tiempoLlamada)} de llamada
+              </div>
+            </div>
+
+            {/* Motivo libre con autocodificación */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Motivo del contacto
+              </div>
+              <textarea
+                className="input"
+                placeholder="Describe brevemente el motivo de la llamada..."
+                value={cierreMotivo}
+                onChange={e => {
+                  setCierreMotivo(e.target.value)
+                  if (e.target.value.length > 8) {
+                    setCierreMotivoCode(codificarMotivoCierre(e.target.value))
+                  } else {
+                    setCierreMotivoCode(null)
+                  }
+                }}
+                style={{ height: 72, resize: 'none', paddingTop: 8 }}
+                autoFocus
+              />
+              {cierreMotivoCode && (
+                <div className="fade-in" style={{ marginTop: 8, padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>🤖 Autocodificación sugerida</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)' }}>{cierreMotivoCode.motivo}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>↳ {cierreMotivoCode.submotivo}</div>
+                  </div>
+                  <button
+                    onClick={() => setCierreMotivoCode(null)}
+                    style={{ fontSize: 10, padding: '3px 8px', borderRadius: 'var(--border-radius-full)', border: '1px solid var(--color-border-secondary)', background: 'white', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    Cambiar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ¿Resuelto? */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                ¿Consulta resuelta?
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[
+                  { val: true, label: '✓ Sí, resuelta', color: 'var(--color-green-dark)', bg: 'var(--color-green-light)', border: 'var(--color-green-border)' },
+                  { val: false, label: '✕ No resuelta', color: 'var(--color-red-dark)', bg: 'var(--color-red-light)', border: 'var(--color-red-border)' },
+                ].map(op => (
+                  <button
+                    key={String(op.val)}
+                    onClick={() => setCierreResuelto(op.val)}
+                    style={{ flex: 1, padding: '10px 8px', border: `1.5px solid ${cierreResuelto === op.val ? op.border : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-md)', background: cierreResuelto === op.val ? op.bg : 'transparent', color: cierreResuelto === op.val ? op.color : 'var(--color-text-secondary)', fontSize: 12, fontWeight: cierreResuelto === op.val ? 700 : 400, cursor: 'pointer', transition: 'all 0.1s' }}>
+                    {op.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Resumen del contacto */}
+            <div style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-tertiary)', fontSize: 11, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Canal</span>
+                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{canalActual}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Duración</span>
+                <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{formatTiempo(tiempoLlamada)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Motivo codificado</span>
+                <span style={{ fontWeight: 600, color: 'var(--color-blue-dark)' }}>{cierreMotivoCode?.motivo || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Resultado</span>
+                <span style={{ fontWeight: 600, color: cierreResuelto === true ? 'var(--color-green-dark)' : cierreResuelto === false ? 'var(--color-red-dark)' : 'var(--color-text-tertiary)' }}>
+                  {cierreResuelto === true ? '✓ Resuelta' : cierreResuelto === false ? '✕ No resuelta' : '—'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => {
+                  if (!cierreMotivo.trim() || cierreResuelto === null) return
+                  setCierreCerrando(true)
+                  setTimeout(() => {
+                    finalizarLlamada()
+                    navigate('/')
+                  }, 1000)
+                }}
+                disabled={cierreCerrando || !cierreMotivo.trim() || cierreResuelto === null}
+                className="btn-primary"
+                style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                {cierreCerrando
+                  ? <><span className="spinner spinner-sm" /> Cerrando...</>
+                  : '✓ Confirmar cierre'}
+              </button>
+              <button
+                onClick={() => setMostrarCierre(false)}
+                className="btn-secondary"
+                style={{ fontSize: 12 }}>
+                Cancelar
+              </button>
+            </div>
+
+            {(!cierreMotivo.trim() || cierreResuelto === null) && (
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', marginTop: -8 }}>
+                El motivo y el resultado son obligatorios para cerrar el contacto
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

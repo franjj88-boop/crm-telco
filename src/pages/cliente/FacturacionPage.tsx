@@ -1117,6 +1117,36 @@ export function FacturacionPage() {
                   </button>
                 </div>
 
+                {/* RF-03 — Cómo va lo mío — resumen reclamación inline */}
+                {reclamacionFactura && (
+                  <div className="fade-in" style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-amber-dark)' }}>
+                        ⚠ Reclamación vinculada — {reclamacionFactura.id}
+                      </div>
+                      <span className={`pill ${reclamacionFactura.estado === 'resuelta' ? 'pill-ok' : reclamacionFactura.estado === 'en_gestion' ? 'pill-blue' : 'pill-warn'}`} style={{ fontSize: 9 }}>
+                        {reclamacionFactura.estado.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-amber-dark)', marginBottom: 6 }}>{reclamacionFactura.motivo}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                      <div style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 'var(--border-radius-sm)' }}>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>EN DISPUTA</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-amber-dark)' }}>{reclamacionFactura.importe.toFixed(2)}€</div>
+                      </div>
+                      <div style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 'var(--border-radius-sm)' }}>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>IMPACTO ESTIMADO</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-green-dark)' }}>Abono en próxima factura</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/cliente/${id}/reclamaciones`)}
+                      style={{ fontSize: 11, color: 'var(--color-amber-dark)', background: 'none', border: '1px solid var(--color-amber-border)', borderRadius: 'var(--border-radius-md)', padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                      Ver seguimiento completo →
+                    </button>
+                  </div>
+                )}
+
                 {factura.esRectificativa && (
                   <div className="fade-in" style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-green-dark)', marginBottom: 4 }}>

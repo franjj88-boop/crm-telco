@@ -333,6 +333,33 @@ export function ReclamacionesPage() {
                   </div>
                 </div>
               )}
+
+              {/* Regla no procede */}
+              {motivoCodificado && (
+                (() => {
+                  const noProcede =
+                    motivoCodificado.submotivo.toLowerCase().includes('masiva') ||
+                    (formFactura && datos.facturas.find(f => f.id === formFactura)?.estado === 'pagada' && parseFloat(formImporte || '0') === 0)
+                  const aviso =
+                    motivoCodificado.motivo.includes('Provisión') ? 'Este tipo de reclamación puede requerir derivación a CGR técnico.' :
+                    motivoCodificado.submotivo.includes('Roaming') ? 'Verificar si el cliente tenía roaming activo antes de reclamar.' :
+                    null
+                  return noProcede ? (
+                    <div className="fade-in" style={{ marginTop: 8, padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-red-light)', border: '1px solid var(--color-red-border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-red-dark)', marginBottom: 3 }}>
+                        ✕ Regla "No procede" activada
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--color-red-dark)' }}>
+                        Esta reclamación no puede tramitarse según las reglas de negocio vigentes. Informar al cliente y derivar si corresponde.
+                      </div>
+                    </div>
+                  ) : aviso ? (
+                    <div className="fade-in" style={{ marginTop: 8, padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--color-amber-dark)' }}>⚠ {aviso}</div>
+                    </div>
+                  ) : null
+                })()
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -1050,8 +1077,14 @@ export function ReclamacionesPage() {
                       </button>
                       {confirmando === 'procedente' && (
                         <div className="fade-in" style={{ marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-green-border)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)' }}>
-                          <div style={{ fontSize: 12, color: 'var(--color-green-dark)', marginBottom: 10 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-green-dark)', marginBottom: 8 }}>
                             ¿Confirmas la resolución favorable? Se programará el abono de <strong>{reclamacion.importeReclamado.toFixed(2)}€</strong> en la próxima factura del cliente.
+                          </div>
+                          <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.6)', border: '1px solid var(--color-green-border)', fontSize: 11, color: 'var(--color-green-dark)', marginBottom: 10 }}>
+                            <div style={{ fontWeight: 700, marginBottom: 3 }}>📧 Mensaje que recibirá el cliente:</div>
+                            <div style={{ fontStyle: 'italic', lineHeight: 1.5 }}>
+                              "Su reclamación {reclamacion.numero} ha sido resuelta favorablemente. Se realizará un abono de {reclamacion.importeReclamado.toFixed(2)}€ en su próxima factura. Gracias por su confianza."
+                            </div>
                           </div>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
@@ -1089,6 +1122,14 @@ export function ReclamacionesPage() {
                             onChange={e => setImprocedMotivo(e.target.value)}
                             style={{ height: 60, resize: 'none', marginBottom: 8, paddingTop: 6 }}
                           />
+                          {improcedMotivo.trim().length >= 5 && (
+                            <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.6)', border: '1px solid var(--color-red-border)', fontSize: 11, color: 'var(--color-red-dark)', marginBottom: 8 }}>
+                              <div style={{ fontWeight: 700, marginBottom: 3 }}>📧 Mensaje que recibirá el cliente:</div>
+                              <div style={{ fontStyle: 'italic', lineHeight: 1.5 }}>
+                                "Su reclamación {reclamacion.numero} ha sido revisada y no ha podido ser estimada. Motivo: {improcedMotivo.trim()}. Si no está de acuerdo puede acudir a segunda instancia."
+                              </div>
+                            </div>
+                          )}
                           <div style={{ fontSize: 10, color: 'var(--color-red-dark)', marginBottom: 8 }}>
                             Se enviará comunicación al cliente con el motivo de denegación.
                           </div>
@@ -1108,8 +1149,21 @@ export function ReclamacionesPage() {
                 )}
 
                 {resuelta && (
-                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '12px 0' }}>
-                    Reclamación {estadoActual} — no se permiten más acciones
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '8px 0' }}>
+                      Reclamación {estadoActual} — no se permiten más acciones sobre esta versión
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEstadoReclamacion(prev => ({ ...prev, [reclamacion.id]: 'en_gestion' }))
+                        setAccionEjecutada(null)
+                      }}
+                      style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--color-amber-border)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      ↻ Reabrir reclamación
+                    </button>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
+                      La reapertura crea una nueva versión manteniendo el historial anterior
+                    </div>
                   </div>
                 )}
               </div>
