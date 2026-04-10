@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { catalogoBundles, catalogoAddonsTV, catalogoDispositivos, buscarBundles } from '../../data/mockData'
+import { catalogoBundles, catalogoAddonsTV, catalogoDispositivos, buscarBundles, catalogoTerceros, crearSenalizacion, compatibilidadTV, addonsTVCore } from '../../data/mockData'
 import type { Bundle, ResultadoBusquedaBundle, Dispositivo } from '../../types'
 
 type Paso = 1 | 2 | 3 | 4 | 5
@@ -257,7 +257,24 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                     </span>
                   </label>
                   <button
-                    onClick={() => { if (firmando) setTimeout(() => setFirmado(true), 1500) }}
+                    onClick={() => {
+                      if (firmando) setTimeout(() => {
+                        // RF01-4: crear señalizaciones reales al firmar
+                        senalizaciones.forEach(id => {
+                          const prod = catalogoTerceros.find(p => p.id === id)
+                          if (prod) crearSenalizacion({
+                            clienteId: 'NUEVO',
+                            productoId: id,
+                            nombreProducto: prod.nombre,
+                            fecha: new Date().toLocaleDateString('es-ES'),
+                            estado: 'pendiente',
+                            notas: `Señalización generada en alta nuevo cliente — ${datos.nombre} ${datos.apellidos}`,
+                            agente: 'AGT-actual',
+                          })
+                        })
+                        setFirmado(true)
+                      }, 1500)
+                    }}
                     disabled={!firmando}
                     style={{ width: '100%', padding: '14px', background: firmando ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: firmando ? 'pointer' : 'not-allowed', transition: 'background 0.2s' }}>
                     🔐 Confirmar pedido con OTP
@@ -569,33 +586,89 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                 </div>
               )}
 
-              {/* Add-ons TV */}
-              {bundleSel && bundleSel.categoria !== 'fibra_sola' && (
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>📺 Televisión (opcional)</div>
-                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Añade los canales que quiera el cliente</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {catalogoAddonsTV.map(a => {
-                      const sel = addonsSel.has(a.id)
-                      return (
-                        <div key={a.id} onClick={() => toggleAddon(a.id)}
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1.5px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white', transition: 'all 0.1s' }}>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? BLUE : '#111827' }}>{a.nombre}</div>
-                            <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{a.canales.slice(0, 3).join(' · ')}</div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: sel ? BLUE : '#374151' }}>+{a.precio}€/mes</span>
-                            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? BLUE : '#D1D5DB'}`, background: sel ? BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {sel && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✓</span>}
+              {/* Add-ons TV — RF01-2 filtrado por porfolio + RF01-3 Ver más */}
+              {bundleSel && bundleSel.categoria !== 'fibra_sola' && (() => {
+                // Nuevo cliente → siempre mi_movistar (catálogo completo)
+                const porfolio: 'fusion' | 'mi_movistar' = 'mi_movistar'
+                const compatibles = compatibilidadTV[porfolio] || []
+                const addonsFiltrados = catalogoAddonsTV.filter(a => compatibles.includes(a.id))
+                const addonsCore = addonsFiltrados.filter(a => addonsTVCore.includes(a.id))
+                const addonsExtra = addonsFiltrados.filter(a => !addonsTVCore.includes(a.id))
+                return (
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>📺 Televisión (opcional)</div>
+                    <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Añade los canales que quiera el cliente</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {addonsCore.map(a => {
+                        const sel = addonsSel.has(a.id)
+                        // RF01-5: descuento bundle si TV Total + convergente
+                        const descuento = a.id === 'tv-total' && bundleSel.categoria.startsWith('convergente') ? 3 : 0
+                        const precioEfectivo = a.precio - descuento
+                        return (
+                          <div key={a.id} onClick={() => toggleAddon(a.id)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1.5px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white', transition: 'all 0.1s' }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? BLUE : '#111827' }}>
+                                {a.nombre}
+                                {a.id === 'tv-total' && <span style={{ fontSize: 9, background: '#F0FDF4', color: '#166534', border: '1px solid #86EFAC', borderRadius: 9999, padding: '1px 6px', marginLeft: 6, fontWeight: 700 }}>COMPLETO</span>}
+                              </div>
+                              <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{a.canales.slice(0, 3).join(' · ')}</div>
+                              {descuento > 0 && sel && (
+                                <div style={{ fontSize: 10, color: '#166534', fontWeight: 700, marginTop: 3 }}>✓ Descuento bundle −{descuento}€ aplicado</div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {descuento > 0 ? (
+                                <div style={{ textAlign: 'right' }}>
+                                  <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#9CA3AF', marginRight: 4 }}>{a.precio}€</span>
+                                  <span style={{ fontSize: 14, fontWeight: 700, color: '#166534' }}>+{precioEfectivo}€/mes</span>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 14, fontWeight: 700, color: sel ? BLUE : '#374151' }}>+{a.precio}€/mes</span>
+                              )}
+                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? BLUE : '#D1D5DB'}`, background: sel ? BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {sel && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✓</span>}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+
+                    {/* RF01-3: Ver más */}
+                    {addonsExtra.length > 0 && (
+                      <>
+                        <button onClick={() => setMostrarMas(!mostrarMas)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: BLUE, fontWeight: 600, padding: '4px 0' }}>
+                          {mostrarMas ? '▲ Ver menos' : `▼ Ver más opciones (${addonsExtra.length})`}
+                        </button>
+                        {mostrarMas && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }} className="fade-in">
+                            {addonsExtra.map(a => {
+                              const sel = addonsSel.has(a.id)
+                              return (
+                                <div key={a.id} onClick={() => toggleAddon(a.id)}
+                                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1.5px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: sel ? BLUE_LIGHT : '#F9FAFB', transition: 'all 0.1s' }}>
+                                  <div>
+                                    <div style={{ fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? BLUE : '#111827' }}>{a.nombre}</div>
+                                    <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{a.canales.join(' · ')}</div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: sel ? BLUE : '#374151' }}>+{a.precio}€/mes</span>
+                                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? BLUE : '#D1D5DB'}`, background: sel ? BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      {sel && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✓</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Portabilidad */}
               {bundleSel && numLineas >= 1 && (
@@ -730,13 +803,13 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                 </div>
               )}
 
-              {/* Productos de terceros */}
+              {/* Productos de terceros — RF01-4 con catalogoTerceros real */}
               {bundleSel && (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: mostrarTerceros ? 16 : 0 }}>
                     <div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>🔗 Productos adicionales</div>
-                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Alarmas, energía solar y otros servicios</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>🤝 Productos de terceros</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Alarmas, energía solar y otros servicios — señalización integrada sin salir de Telco</div>
                     </div>
                     <button onClick={() => setMostrarTerceros(!mostrarTerceros)}
                       style={{ fontSize: 13, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
@@ -745,39 +818,34 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                   </div>
                   {mostrarTerceros && (
                     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {[
-                        { id: 'seguro', icono: '🛡', nombre: 'Seguro móvil', desc: 'Rotura, robo y daños accidentales', precio: 5.99, contrat: true },
-                        { id: 'alarma', icono: '🔔', nombre: 'Alarma MPA', desc: 'Seguridad para el hogar', precio: 0, contrat: false },
-                        { id: 'solar', icono: '☀️', nombre: 'Solar 360 CT', desc: 'Energía solar para el hogar', precio: 0, contrat: false },
-                        { id: 'roaming', icono: '✈️', nombre: 'Bono Roaming Europa', desc: 'Datos en Europa sin coste adicional', precio: 3.90, contrat: true },
-                      ].map(p => {
-                        const sen = senalizaciones.includes(p.id)
+                      {catalogoTerceros.map(prod => {
+                        const sen = senalizaciones.includes(prod.id)
                         return (
-                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1.5px solid ${sen ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: 8, background: sen ? '#F0FDF4' : 'white' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <span style={{ fontSize: 22 }}>{p.icono}</span>
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{p.nombre}</div>
-                                <div style={{ fontSize: 12, color: '#9CA3AF' }}>{p.desc}</div>
+                          <div key={prod.id}
+                            onClick={() => setSenalizaciones(prev => prev.includes(prod.id) ? prev.filter(s => s !== prod.id) : [...prev, prod.id])}
+                            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 16px', border: `1.5px solid ${sen ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: 8, background: sen ? '#F0FDF4' : 'white', cursor: 'pointer', transition: 'all 0.1s' }}>
+                            <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{prod.icono}</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                                <span style={{ fontSize: 13, fontWeight: sen ? 700 : 600, color: sen ? '#166534' : '#111827' }}>{prod.nombre}</span>
+                                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, fontWeight: 700, background: prod.tramitable ? '#F0FDF4' : '#FFFBEB', color: prod.tramitable ? '#166534' : '#92400E', border: `1px solid ${prod.tramitable ? '#86EFAC' : '#FCD34D'}` }}>
+                                  {prod.tramitable ? '✓ Tramitable' : '📋 Señalizable'}
+                                </span>
                               </div>
+                              <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>{prod.proveedor}</div>
+                              <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>{prod.descripcion}</div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              {!p.contrat && (
-                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#FFFBEB', color: '#92400E', border: '1px solid #FCD34D', fontWeight: 700 }}>SEÑALIZABLE</span>
-                              )}
-                              {p.contrat && <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>+{p.precio}€/mes</span>}
-                              <button
-                                onClick={() => !p.contrat && setSenalizaciones(prev => prev.includes(p.id) ? prev.filter(s => s !== p.id) : [...prev, p.id])}
-                                style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, border: `1.5px solid ${sen ? '#16A34A' : p.contrat ? BLUE : '#F59E0B'}`, borderRadius: 6, background: sen ? '#16A34A' : 'white', color: sen ? 'white' : p.contrat ? BLUE : '#92400E', cursor: 'pointer' }}>
-                                {sen ? '✓ Señalizado' : p.contrat ? '+ Añadir' : 'Señalizar'}
-                              </button>
+                            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                              <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${sen ? '#16A34A' : '#D1D5DB'}`, background: sen ? '#16A34A' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {sen && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>✓</span>}
+                              </div>
                             </div>
                           </div>
                         )
                       })}
                       {senalizaciones.length > 0 && (
-                        <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
-                          📋 Un especialista contactará al cliente para completar: <strong>{senalizaciones.join(', ')}</strong>
+                        <div style={{ padding: '10px 14px', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 8, fontSize: 12, color: BLUE }}>
+                          ℹ️ Al confirmar el pedido se generará una señalización para <strong>{senalizaciones.length} producto{senalizaciones.length > 1 ? 's' : ''}</strong>. Un especialista contactará al cliente para cada uno.
                         </div>
                       )}
                     </div>
