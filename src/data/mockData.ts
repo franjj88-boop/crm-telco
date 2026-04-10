@@ -852,7 +852,16 @@ export const datosCliente: Record<string, Cliente> = {
     historial: [
       { id: 'h1', fecha: '15/03/2026', canal: 'Teléfono', motivo: 'Consulta ampliación líneas móviles', causaAgrupacion: 'Venta', resolucion: 'Info dada — interés en 2 líneas más', agente: 'AGT-556', duracion: '18min', resuelto: true },
       { id: 'h2', fecha: '10/01/2026', canal: 'Tienda', motivo: 'Renovación contrato anual', causaAgrupacion: 'Renovación', resolucion: 'Contrato renovado hasta ene 2027', agente: 'TDA-012', duracion: '35min', resuelto: true },
-    ]
+    ],
+    senalizacionesParque: [
+      {
+        id: 'sp1',
+        nombreProducto: 'Alarma Movistar Prosegur',
+        proveedor: 'Movistar Prosegur Alarmas',
+        icono: '🔒',
+        estado: 'pendiente',
+      }
+    ],
   }
 }
 
@@ -934,6 +943,148 @@ export const historicoPagosPorCliente: Record<string, {
     { id: 'hp4', periodo: 'Noviembre 2025', numeroFactura: 'FAC-2025-11-0051', importe: 245.70, fechaVencimiento: '20/11/2025', fechaPago: '20/11/2025', metodoPago: 'Domiciliación bancaria', diasRetraso: 0 },
     { id: 'hp5', periodo: 'Octubre 2025', numeroFactura: 'FAC-2025-10-0044', importe: 289.30, fechaVencimiento: '20/10/2025', fechaPago: '20/10/2025', metodoPago: 'Domiciliación bancaria', diasRetraso: 0 },
   ],
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENDUKA — PRODUCTOS DE TERCEROS (RF01-4, RF01-6)
+// ═══════════════════════════════════════════════════════════════
+
+export interface ProductoTercero {
+  id: string
+  nombre: string
+  proveedor: string
+  icono: string
+  descripcion: string
+  tramitable: boolean
+  canales: string[]
+}
+
+export const catalogoTerceros: ProductoTercero[] = [
+  {
+    id: 'alarma-mpa',
+    nombre: 'Alarma Movistar Prosegur',
+    proveedor: 'Movistar Prosegur Alarmas',
+    icono: '🔒',
+    descripcion: 'Sistema de alarma con monitorización 24h. Un especialista contactará al cliente para finalizar la instalación.',
+    tramitable: false,
+    canales: ['tienda', 'telefono', 'chat', 'whatsapp'],
+  },
+  {
+    id: 'solar-360',
+    nombre: 'Solar 360 CT',
+    proveedor: 'Solar 360 CT',
+    icono: '☀️',
+    descripcion: 'Instalación de paneles solares con autoconsumo. Requiere visita técnica de valoración.',
+    tramitable: false,
+    canales: ['tienda', 'telefono'],
+  },
+  {
+    id: 'seguro-movil',
+    nombre: 'Seguro de Móvil Plus',
+    proveedor: 'Movistar Seguros',
+    icono: '📱',
+    descripcion: 'Cobertura total ante rotura, robo y líquidos. Contratación inmediata.',
+    tramitable: true,
+    canales: ['tienda', 'telefono', 'chat', 'whatsapp'],
+  },
+]
+
+export interface Senalizacion {
+  id: string
+  clienteId: string
+  productoId: string
+  nombreProducto: string
+  fecha: string
+  estado: 'pendiente' | 'contactado' | 'convertido' | 'descartado'
+  notas: string
+  agente: string
+}
+
+export let senalizacionesAgente: Senalizacion[] = [
+  {
+    id: 'sen-001',
+    clienteId: 'CRM-003',
+    productoId: 'alarma-mpa',
+    nombreProducto: 'Alarma Movistar Prosegur',
+    fecha: '15/03/2026',
+    estado: 'pendiente',
+    notas: 'Cliente mostró interés en última interacción. Contactar esta semana.',
+    agente: 'AGT-556',
+  },
+]
+
+export function crearSenalizacion(s: Omit<Senalizacion, 'id'>): Senalizacion {
+  const nueva: Senalizacion = { ...s, id: `sen-${Date.now()}` }
+  senalizacionesAgente = [nueva, ...senalizacionesAgente]
+  return nueva
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENDUKA — COMPATIBILIDAD TV (RF01-2, RF01-3)
+// ═══════════════════════════════════════════════════════════════
+
+export type PaqueteBase = 'fusion' | 'mi_movistar'
+
+export const compatibilidadTV: Record<PaqueteBase, string[]> = {
+  fusion: ['tv-ficcion', 'tv-futbol', 'tv-total'],
+  mi_movistar: ['tv-ficcion', 'tv-futbol', 'tv-total', 'tv-netflix', 'tv-disney'],
+}
+
+export const addonsTVCore = ['tv-ficcion', 'tv-futbol', 'tv-total']
+
+// ═══════════════════════════════════════════════════════════════
+// GENDUKA — EQUIVALENCIAS FUSIÓN → MI MOVISTAR (RF01-1)
+// ═══════════════════════════════════════════════════════════════
+
+export interface PropuestaMigracion {
+  bundleActualId: string
+  bundleEquivalenteId: string
+  descripcionCambio: string
+  deltaEuros: number
+  beneficios: string[]
+}
+
+export const equivalenciasFusion: PropuestaMigracion[] = [
+  {
+    bundleActualId: 'cv1-300-20',
+    bundleEquivalenteId: 'cv1-600-30',
+    descripcionCambio: 'Migración de Fusión 300Mb+20GB a mi Movistar 600Mb+30GB',
+    deltaEuros: 10.00,
+    beneficios: [
+      'El doble de velocidad de fibra (600Mb vs 300Mb)',
+      'Más datos móviles (30GB vs 20GB)',
+      'Acceso a toda la oferta de TV de mi Movistar',
+      'Atención prioritaria canal digital',
+    ],
+  },
+  {
+    bundleActualId: 'cv1-600-30',
+    bundleEquivalenteId: 'cv1-600-inf',
+    descripcionCambio: 'Migración de Fusión 600Mb+30GB a mi Movistar 600Mb+Ilimitado',
+    deltaEuros: 10.00,
+    beneficios: [
+      'Datos móviles ilimitados sin límite de velocidad',
+      'Misma velocidad de fibra (600Mb)',
+      'Acceso completo a TV mi Movistar (Netflix, Disney+)',
+      'Atención prioritaria canal digital',
+    ],
+  },
+  {
+    bundleActualId: 'cv2-600-inf-inf',
+    bundleEquivalenteId: 'cv2-1g-inf-inf',
+    descripcionCambio: 'Migración de Fusión 600Mb+2xIlimitado a mi Movistar 1Gb+2xIlimitado',
+    deltaEuros: 10.00,
+    beneficios: [
+      'Fibra 1Gb — máxima velocidad disponible',
+      'Mantiene 2 líneas ilimitadas',
+      'Acceso completo a TV mi Movistar',
+      'Soporte técnico premium',
+    ],
+  },
+]
+
+export function getPropuestaMigracion(bundleActualId: string): PropuestaMigracion | null {
+  return equivalenciasFusion.find(e => e.bundleActualId === bundleActualId) || null
 }
 
 // ── ÍNDICE BÚSQUEDA ──

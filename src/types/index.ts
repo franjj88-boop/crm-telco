@@ -29,6 +29,14 @@ export interface Cliente {
   facturas: Factura[]
   cobros: Cobros
   historial: Interaccion[]
+  senalizacionesParque?: {
+    id: string
+    nombreProducto: string
+    proveedor: string
+    icono: string
+    estado: 'pendiente' | 'activo' | 'cancelado'
+    fechaContratacion?: string
+  }[]
   riesgoScore: 'bajo' | 'medio' | 'alto'
   representantes: Representante[]
 }
