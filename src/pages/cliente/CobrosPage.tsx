@@ -59,6 +59,9 @@ export function CobrosPage() {
   const [historicoPagosVisible, setHistoricoPagosVisible] = useState(false)
   const [vruTransferido, setVruTransferido] = useState(false)
   const [vruResultado, setVruResultado] = useState<'pendiente' | 'ok' | 'fallido' | null>(null)
+  const [compensacionTipo, setCompensacionTipo] = useState<'intra' | 'cruzada' | null>(null)
+  const [compensacionEjecutada, setCompensacionEjecutada] = useState(false)
+  const [mostrarCompensacion, setMostrarCompensacion] = useState(false)
 
   if (!id) return null
   const datos = datosCliente[id]
@@ -104,6 +107,14 @@ export function CobrosPage() {
       return {
         bloqueada: true,
         motivo: 'Fraccionamiento activo — el importe está siendo gestionado en cuotas'
+      }
+    }
+
+    // RN-COB-07: no permitir nuevo fraccionamiento si ya hay uno activo
+    if (cobros.fraccionamientoActivo && accionId === 'fracc') {
+      return {
+        bloqueada: true,
+        motivo: `Fraccionamiento activo en curso — ${cobros.fraccionamientoActivo.cuotasPagadas}/${cobros.fraccionamientoActivo.totalCuotas} cuotas pagadas. Esperar a liquidación o renegociar con especialista.`
       }
     }
 
@@ -513,7 +524,8 @@ export function CobrosPage() {
                       <button
                         onClick={() => {
                           if (blq.bloqueada) return
-                          if (a.id === 'fracc') { setMostrarFracc(!mostrarFracc); return }
+                          if (a.id === 'fracc') { setMostrarFracc(!mostrarFracc); setMostrarCompensacion(false); return }
+                          if (a.id === 'compens') { setMostrarCompensacion(!mostrarCompensacion); setMostrarFracc(false); return }
                           if (a.id === 'tarjeta') {
                             setVruTransferido(true)
                             setVruResultado('pendiente')
@@ -597,6 +609,77 @@ export function CobrosPage() {
                 </div>
               )}
 
+              {/* RF-COB-07 — Compensación intra/cruzada */}
+              {mostrarCompensacion && (() => {
+                const saldo = cobros.saldoAFavor || 0
+                const deuda = cobros.deudaTotal
+                const tieneDeudaOtra = cobros.tieneDeudaO2
+                const importesCoinciden = saldo > 0 && Math.abs(saldo - deuda) < 0.01
+
+                return (
+                  <div style={{ marginTop: 12, padding: '12px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-secondary)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Compensación de deuda</div>
+
+                    {saldo > 0 ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>Saldo a favor (misma jurídica)</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-green-dark)' }}>+{saldo.toFixed(2)}€</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 12 }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>Deuda pendiente</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-red-dark)' }}>{deuda.toFixed(2)}€</span>
+                        </div>
+
+                        {compensacionEjecutada ? (
+                          <div className="alert alert-ok fade-in"><span>✓</span><div style={{ fontSize: 11 }}>Compensación intra-jurídica ejecutada — saldo aplicado a deuda</div></div>
+                        ) : (
+                          <button
+                            onClick={() => { setCompensacionEjecutada(true); setCompensacionTipo('intra') }}
+                            className="btn-primary"
+                            style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
+                            ✓ Ejecutar compensación intra-jurídica ({saldo.toFixed(2)}€)
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+                        Sin saldo a favor en esta jurídica
+                      </div>
+                    )}
+
+                    {/* Compensación cruzada — RF-COB-07 RN-COB-03 */}
+                    {tieneDeudaOtra && (
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border-secondary)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                          Compensación cruzada (otra jurídica)
+                        </div>
+                        {importesCoinciden ? (
+                          <button
+                            onClick={() => { setCompensacionEjecutada(true); setCompensacionTipo('cruzada') }}
+                            disabled={compensacionEjecutada}
+                            className="btn-primary"
+                            style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
+                            ✓ Ejecutar compensación cruzada — importes coinciden
+                          </button>
+                        ) : (
+                          <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)' }}>
+                            <div style={{ fontWeight: 700, marginBottom: 3 }}>⚠ Importes no coinciden — compensación cruzada bloqueada</div>
+                            <div>RN-COB-03: La compensación cruzada requiere importes idénticos. Escalar a especialista de cobros.</div>
+                            <button
+                              onClick={() => ejecutar('Escalado a especialista cobros multimarca')}
+                              className="btn-secondary"
+                              style={{ marginTop: 8, fontSize: 11 }}>
+                              Escalar a especialista →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {/* Retorno VRU en tiempo real */}
               {vruTransferido && (
                 <div className="fade-in" style={{ marginTop: 12, padding: '12px', borderRadius: 'var(--border-radius-md)', border: `1px solid ${vruResultado === 'ok' ? 'var(--color-green-border)' : vruResultado === 'fallido' ? 'var(--color-red-border)' : 'var(--color-blue-mid)'}`, background: vruResultado === 'ok' ? 'var(--color-green-light)' : vruResultado === 'fallido' ? 'var(--color-red-light)' : 'var(--color-blue-light)' }}>
@@ -669,19 +752,67 @@ export function CobrosPage() {
                   })()}
                 </div>
 
-                {/* Vista multimarca — deuda O2 sin importe */}
-                {cobros.tieneDeudaO2 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Deuda en O2 (otra marca)</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-amber-dark)' }}>
-                        ⚠ Cliente con deuda activa en O2
+                {/* RF-COB-06 — Indicador EGC/FGES */}
+                {cobros.cedidaEGC && (
+                  <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-red-light)', border: '1px solid var(--color-red-border)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Deuda cedida a EGC/FGES</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-red-dark)' }}>
+                      ⛔ Deuda cedida a empresa de gestión de cobros externa
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--color-red-dark)', marginTop: 3, lineHeight: 1.5 }}>
+                      Las acciones de cobro estándar están restringidas. Contactar con especialista EGC/FGES para gestión.
+                    </div>
+                  </div>
+                )}
+
+                {/* RF-COB-06 — Indicador deuda incobrable */}
+                {cobros.deudaIncobrable && (
+                  <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-secondary)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Deuda incobrable</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                      📁 Deuda en bolsa incobrable — sin acciones de cobro ordinarias
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
+                      No genera acciones de recobro. Visible solo a efectos informativos.
+                    </div>
+                  </div>
+                )}
+
+                {/* RF-COB-07 — Saldo a favor disponible */}
+                {(cobros.saldoAFavor || 0) > 0 && (
+                  <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Saldo a favor</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-green-dark)' }}>
+                        ✓ Disponible para compensación
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                        Importe no visible — consultar con especialista de cobros multimarca
+                      <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-green-dark)' }}>
+                        +{(cobros.saldoAFavor || 0).toFixed(2)}€
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* RF-COB-09 — Alerta multimarca O2 */}
+                {cobros.tieneDeudaO2 && (
+                  <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>⚠ Alerta multimarca — O2</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-amber-dark)' }}>
+                          Deuda activa detectada en marca O2
+                        </div>
+                      </div>
+                      <span className="pill pill-warn" style={{ fontSize: 10, flexShrink: 0 }}>RIESGO</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--color-amber-dark)', lineHeight: 1.5, marginBottom: 6 }}>
+                      RF-COB-09: Indicador de riesgo/fraude cross-marca. No se pueden ejecutar acciones sobre la deuda O2 desde este perfil.
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ flex: 1, padding: '5px 8px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(255,255,255,0.6)', fontSize: 10, color: 'var(--color-amber-dark)' }}>
+                        🔒 Acción fuera de marca — consultar con especialista cobros multimarca
                       </div>
                     </div>
-                    <span className="pill pill-warn" style={{ fontSize: 10, flexShrink: 0 }}>O2</span>
                   </div>
                 )}
 

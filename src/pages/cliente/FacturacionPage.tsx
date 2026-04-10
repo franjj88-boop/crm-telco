@@ -130,7 +130,7 @@ export function FacturacionPage() {
   const [envioDestinatario, setEnvioDestinatario] = useState('')
   const [envioDuplicado, setEnvioDuplicado] = useState(false)
   const [trazabilidadEnvios, setTrazabilidadEnvios] = useState<{ fecha: string; canal: string; destinatario: string; factura: string }[]>([])
-  const [panelAbierto, setPanelAbierto] = useState<'consumos' | 'buscador' | 'simulador' | 'comparativa' | null>(null)
+  const [panelAbierto, setPanelAbierto] = useState<'consumos' | 'buscador' | 'simulador' | 'comparativa' | 'prefactura' | null>(null)
 
   const [modoComparativa, setModoComparativa] = useState(false)
   const [facturaComp1, setFacturaComp1] = useState<string | null>(null)
@@ -167,6 +167,7 @@ export function FacturacionPage() {
   const mostrarConsumos = panelAbierto === 'consumos'
   const modoBuscador = panelAbierto === 'buscador'
   const modoSimulador = panelAbierto === 'simulador'
+  const modoPreFactura = panelAbierto === 'prefactura'
 
   if (!id) return null
   const datos = datosCliente[id]
@@ -363,6 +364,11 @@ export function FacturacionPage() {
             🔍 Buscar
           </button>
           <button
+            onClick={() => setPanelAbierto(panelAbierto === 'prefactura' ? null : 'prefactura')}
+            style={{ padding: '4px 12px', fontSize: 11, borderRadius: 'var(--border-radius-full)', border: `1.5px solid ${modoPreFactura ? 'var(--color-green-border)' : 'var(--color-border-secondary)'}`, background: modoPreFactura ? 'var(--color-green-light)' : 'none', color: modoPreFactura ? 'var(--color-green-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: modoPreFactura ? 600 : 400 }}>
+            🧾 Pre-factura
+          </button>
+          <button
             onClick={() => setPanelAbierto(panelAbierto === 'simulador' ? null : 'simulador')}
             style={{ padding: '4px 12px', fontSize: 11, borderRadius: 'var(--border-radius-full)', border: `1.5px solid ${modoSimulador ? 'var(--color-purple-border)' : 'var(--color-border-secondary)'}`, background: modoSimulador ? 'var(--color-purple-light)' : 'none', color: modoSimulador ? 'var(--color-purple)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: modoSimulador ? 600 : 400 }}>
             📊 Simulador
@@ -521,6 +527,153 @@ export function FacturacionPage() {
           )}
         </div>
       )}
+
+      {/* ── PRE-FACTURA — Factura cerrada pendiente de cargo bancario ── */}
+      {modoPreFactura && (() => {
+        // Datos de pre-factura simulados basados en el cliente activo
+        const ultimaFactura = datos.facturas.filter(f => !(f as any).esRectificativa)[0]
+        const fechaCierre = '09/04/2026'
+        const fechaCargo = '13/04/2026'
+        const diasParaCargo = 2
+
+        // Conceptos de la pre-factura = mismos que la última + consumos en vuelo cerrados
+        const conceptosPreFactura = [
+          ...( ultimaFactura?.conceptos.filter(c => c.tipo === 'cuota' || c.tipo === 'dispositivo' || c.tipo === 'descuento') || []),
+          // Consumos en vuelo que ya entraron en el cierre
+          ...consumosEnVuelo.map((c, i) => ({
+            id: `vuelo-${i}`,
+            descripcion: c.descripcion,
+            importe: c.importe,
+            tipo: 'consumo' as const,
+            anomalo: c.importe > 5,
+          }))
+        ]
+
+        const importePreFactura = conceptosPreFactura.reduce((a, c) => a + c.importe, 0)
+        const importeAnterior = ultimaFactura?.importe || 0
+        const delta = importePreFactura - importeAnterior
+
+        return (
+          <div className="card fade-in" style={{ border: '1.5px solid var(--color-green-border)', background: 'var(--color-green-light)' }}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)' }}>🧾 Pre-factura — Abril 2026</span>
+                  <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 9999, background: 'var(--color-green-border)', color: '#fff', fontWeight: 700 }}>CERRADA</span>
+                  <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 9999, background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', fontWeight: 700 }}>PENDIENTE CARGO</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-green-dark)', opacity: 0.85 }}>
+                  Factura cerrada el {fechaCierre} · Cargo bancario previsto el <strong>{fechaCargo}</strong>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-green-dark)' }}>
+                  {importePreFactura.toFixed(2)}€
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--color-green-dark)', opacity: 0.8 }}>Pendiente de cargo</div>
+              </div>
+            </div>
+
+            {/* Cuenta atrás para cargo */}
+            <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.65)', border: '1px solid var(--color-green-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-green-border)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{diasParaCargo}</span>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-green-dark)' }}>
+                  Cargo bancario en {diasParaCargo} días
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--color-green-dark)', opacity: 0.8, marginTop: 2 }}>
+                  {datos.cobros.estadoGeneral !== 'sin_deuda' ? '⚠ Revisar domiciliación' : '✓ Domiciliación activa — cargo automático el ' + fechaCargo}
+                </div>
+              </div>
+            </div>
+
+            {/* Comparativa vs factura anterior */}
+            {ultimaFactura && (
+              <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: delta > 0 ? 'var(--color-red-light)' : delta < 0 ? 'var(--color-green-light)' : 'rgba(255,255,255,0.5)', border: `1px solid ${delta > 0 ? 'var(--color-red-border)' : delta < 0 ? 'var(--color-green-border)' : 'var(--color-border-secondary)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, color: delta > 0 ? 'var(--color-red-dark)' : delta < 0 ? 'var(--color-green-dark)' : 'var(--color-text-secondary)' }}>
+                  {delta > 0 ? '↑ Incremento' : delta < 0 ? '↓ Reducción' : '= Sin cambios'} vs {ultimaFactura.periodo}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: delta > 0 ? 'var(--color-red-dark)' : delta < 0 ? 'var(--color-green-dark)' : 'var(--color-text-secondary)' }}>
+                  {delta > 0 ? '+' : ''}{delta.toFixed(2)}€
+                </div>
+              </div>
+            )}
+
+            {/* Desglose de conceptos */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-green-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, opacity: 0.8 }}>
+                Desglose de conceptos
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {conceptosPreFactura.map((c, i) => (
+                  <div key={c.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.65)', border: `1px solid ${c.anomalo ? 'var(--color-amber-border)' : 'var(--color-green-border)'}` }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-green-dark)' }}>
+                        {c.anomalo && '⚠ '}{c.descripcion}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--color-green-dark)', opacity: 0.7, marginTop: 1, textTransform: 'capitalize' }}>
+                        {c.tipo === 'consumo' ? '⚡ Consumo en vuelo — incluido en este cierre' : c.tipo}
+                      </div>
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: c.importe < 0 ? 'var(--color-green)' : c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-green-dark)', flexShrink: 0, marginLeft: 12 }}>
+                      {c.importe > 0 ? '+' : ''}{c.importe.toFixed(2)}€
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Total y aviso */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.8)', border: '1.5px solid var(--color-green-border)', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)' }}>Total pre-factura</span>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-green-dark)' }}>{importePreFactura.toFixed(2)}€</div>
+                <div style={{ fontSize: 10, color: 'var(--color-green-dark)', opacity: 0.8 }}>{(importePreFactura * 1.21).toFixed(2)}€ con IVA</div>
+              </div>
+            </div>
+
+            {/* Anomalías detectadas */}
+            {conceptosPreFactura.some(c => c.anomalo) && (
+              <div className="alert alert-warn fade-in" style={{ marginBottom: 12 }}>
+                <span>⚠</span>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Anomalías detectadas en esta pre-factura</div>
+                  <div style={{ fontSize: 11, marginTop: 2 }}>
+                    Hay cargos marcados como anómalos. El cliente puede reclamarlos cuando la factura se emita oficialmente.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Acciones */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => navigate(`/cliente/${id}/consumos`)}
+                className="btn-secondary"
+                style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
+                Ver consumos →
+              </button>
+              <button
+                onClick={() => {
+                  setEnvioDestinatario(datos.email || '')
+                  setModalEnvio(true)
+                }}
+                className="btn-secondary"
+                style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
+                📧 Enviar pre-factura al cliente
+              </button>
+            </div>
+
+            <div style={{ marginTop: 10, fontSize: 10, color: 'var(--color-green-dark)', opacity: 0.75, fontStyle: 'italic' }}>
+              ⚠ La pre-factura es informativa. El importe definitivo puede variar hasta la emisión oficial. No genera reclamación hasta que la factura esté emitida.
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── SIMULADOR DE FACTURA FUTURA (RF-11) ── */}
       {modoSimulador && (
@@ -1221,13 +1374,38 @@ export function FacturacionPage() {
                                 )
                               })()}
                               <div style={{ display: 'flex', gap: 6 }}>
-                                {(diag.badge === 'anomalia' || diag.badge === 'no_identificada' || diag.badge === 'nuevo' || diag.badge === 'subida') && (
+                                {(diag.badge === 'anomalia' || diag.badge === 'no_identificada' || diag.badge === 'nuevo' || diag.badge === 'subida') && (() => {
+                                // RF-16 CA-04: bloqueo si hay masiva activa
+                                const masivaActiva = datos.averias.some(a => a.masiva && a.estado !== 'resuelta')
+                                // RF-02 CA-03: aviso si ya existe reclamación abierta sobre esta factura
+                                const reclamacionDuplicada = datos.reclamaciones.some(r =>
+                                  r.facturaId === factura?.id && (r.estado === 'abierta' || r.estado === 'en_gestion')
+                                )
+                                if (masivaActiva) return (
+                                  <div style={{ padding: '7px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                                    📡 Incidencia masiva activa — reclamación económica bloqueada. Informar al cliente del ETA de resolución.
+                                  </div>
+                                )
+                                if (reclamacionDuplicada) return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <div style={{ padding: '7px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                                      ℹ Ya existe una reclamación activa sobre esta factura — no se puede abrir otra hasta su resolución.
+                                    </div>
+                                    <button
+                                      onClick={() => navigate(`/cliente/${id}/reclamaciones`)}
+                                      className="btn-secondary" style={{ fontSize: 11, height: 28 }}>
+                                      Ver reclamación activa →
+                                    </button>
+                                  </div>
+                                )
+                                return (
                                   <button
                                     onClick={() => navigate(`/cliente/${id}/reclamaciones`, { state: { abrirFormulario: true, facturaId: factura?.id, importe: c.importe, motivo: `Reclamación: ${c.descripcion}` } })}
                                     className="btn-danger" style={{ fontSize: 11, height: 28 }}>
                                     ⚠ Reclamar este concepto
                                   </button>
-                                )}
+                                )
+                              })()}
                                 <button
                                   onClick={() => navigate(`/cliente/${id}/consumos`)}
                                   className="btn-secondary" style={{ fontSize: 11, height: 28 }}>
@@ -1327,11 +1505,32 @@ export function FacturacionPage() {
                       ))}
                     </div>
                   )}
-                  {conceptosSel.size > 0 && (
-                    <button onClick={() => navigate(`/cliente/${id}/reclamaciones`, { state: { abrirFormulario: true, facturaId: factura?.id, importe: importeSeleccionado, motivo: `Reclamación conceptos: ${factura?.conceptos.filter(c => conceptosSel.has(c.id)).map(c => c.descripcion).join(', ')}` } })} className="btn-danger" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
-                      ⚠ Reclamar {conceptosSel.size} concepto/s — {importeSeleccionado.toFixed(2)}€
-                    </button>
-                  )}
+                  {conceptosSel.size > 0 && (() => {
+                    const masivaActiva = datos.averias.some(a => a.masiva && a.estado !== 'resuelta')
+                    const reclamacionDuplicada = datos.reclamaciones.some(r =>
+                      r.facturaId === factura?.id && (r.estado === 'abierta' || r.estado === 'en_gestion')
+                    )
+                    if (masivaActiva) return (
+                      <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                        📡 Incidencia masiva activa — reclamación económica bloqueada hasta resolución de la masiva.
+                      </div>
+                    )
+                    if (reclamacionDuplicada) return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                          ℹ Ya existe una reclamación activa sobre esta factura — no se puede duplicar.
+                        </div>
+                        <button onClick={() => navigate(`/cliente/${id}/reclamaciones`)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
+                          Ver reclamación activa →
+                        </button>
+                      </div>
+                    )
+                    return (
+                      <button onClick={() => navigate(`/cliente/${id}/reclamaciones`, { state: { abrirFormulario: true, facturaId: factura?.id, importe: importeSeleccionado, motivo: `Reclamación conceptos: ${factura?.conceptos.filter(c => conceptosSel.has(c.id)).map(c => c.descripcion).join(', ')}` } })} className="btn-danger" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
+                        ⚠ Reclamar {conceptosSel.size} concepto/s — {importeSeleccionado.toFixed(2)}€
+                      </button>
+                    )
+                  })()}
                   {factura.estado === 'vencida' && (
                     <button onClick={() => navigate(`/cliente/${id}/cobros`)} className="btn-danger" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
                       💳 Gestionar cobro

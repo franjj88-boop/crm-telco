@@ -47,6 +47,11 @@ export function AveriasPage() {
   const [cargando, setCargando] = useState(false)
   const [averiaAbierta, setAveriaAbierta] = useState(false)
   const [nuevaAveriaId, setNuevaAveriaId] = useState<string | null>(null)
+  const [ultimoRefresco, setUltimoRefresco] = useState<Date>(new Date())
+  const [refrescando, setRefrescando] = useState(false)
+  const [mostrarDescartes, setMostrarDescartes] = useState(false)
+  const [derivandoN2, setDerivendoN2] = useState(false)
+  const [derivadoN2, setDerivadoN2] = useState(false)
 
   if (!id) return null
   const datos = datosCliente[id]
@@ -55,6 +60,14 @@ export function AveriasPage() {
   const averiaExistente = datos.averias[0] || null
   const masiva = averiaExistente?.masiva || null
   const bloqueadaImpago = datos.cobros.estadoGeneral === 'vencida'
+
+  const refrescar = () => {
+    setRefrescando(true)
+    setTimeout(() => { setRefrescando(false); setUltimoRefresco(new Date()) }, 1200)
+  }
+
+  const minutosDesdeRefresco = Math.floor((new Date().getTime() - ultimoRefresco.getTime()) / 60000)
+  const datosFrescos = minutosDesdeRefresco < 5
 
   const ejecutarAccion = (accion: string) => {
     setCargando(true)
@@ -169,9 +182,16 @@ export function AveriasPage() {
         <div className="card card-err">
           <div className="card-title">
             Avería activa — {averiaExistente.numero}
-            <span className={`pill ${averiaExistente.estado === 'resuelta' ? 'pill-ok' : averiaExistente.estado === 'bloqueada_impago' ? 'pill-err' : averiaExistente.estado === 'asociada_masiva' ? 'pill-warn' : 'pill-blue'}`}>
-              {averiaExistente.estado.replace(/_/g, ' ')}
-            </span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span className={`pill ${averiaExistente.estado === 'resuelta' ? 'pill-ok' : averiaExistente.estado === 'bloqueada_impago' ? 'pill-err' : averiaExistente.estado === 'asociada_masiva' ? 'pill-warn' : 'pill-blue'}`}>
+                {averiaExistente.estado.replace(/_/g, ' ')}
+              </span>
+              {averiaExistente.estado === 'asociada_masiva' && (
+                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', fontWeight: 700 }}>
+                  📡 Asociada a masiva — SLA suspendido
+                </span>
+              )}
+            </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
             {[
@@ -179,7 +199,7 @@ export function AveriasPage() {
               { label: 'Producto', val: averiaExistente.producto },
               { label: 'Prioridad', val: averiaExistente.prioridad },
               { label: 'Fecha apertura', val: averiaExistente.fechaApertura },
-              { label: 'SLA activo', val: averiaExistente.slaActivo ? 'Sí' : 'No — suspendido' },
+              { label: 'SLA activo', val: averiaExistente.slaActivo ? 'Sí' : averiaExistente.estado === 'asociada_masiva' ? 'No — suspendido por masiva (RN-AV-14)' : 'No — suspendido' },
             ].map(row => (
               <div key={row.label} className="table-row" style={{ gridColumn: row.label === 'Síntoma' ? '1/-1' : 'auto' }}>
                 <span className="table-row-label">{row.label}</span>
@@ -275,10 +295,36 @@ export function AveriasPage() {
                 </div>
               )}
 
+              {/* RF-AV-08 — Derivación a N2 con contexto */}
+              {derivadoN2 && (
+                <div className="alert alert-ok fade-in">
+                  <span>✓</span>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Derivado a Nivel 2 — contexto transferido</div>
+                    <div style={{ fontSize: 11, marginTop: 4, lineHeight: 1.6 }}>
+                      📋 Contexto enviado: síntoma "<strong>{sintomaSel}</strong>" · Grupo: {grupoSel} · {averiaExistente ? `Avería ${averiaExistente.numero}` : 'Sin avería previa'} · Diagnóstico: {averiaExistente?.diagnosticoTecnico || 'Pendiente'} · Acciones previas: {accionEjecutada || 'Ninguna'}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {derivandoN2 && (
+                <div className="alert alert-blue fade-in">
+                  <span className="spinner spinner-sm" />
+                  <span>Transfiriendo contexto completo a experto N2...</span>
+                </div>
+              )}
+
               {(accionesPorGrupo[grupoSel] || []).map(a => (
                 <button
                   key={a.label}
-                  onClick={() => !bloqueadaImpago && !masiva && ejecutarAccion(a.label)}
+                  onClick={() => {
+                    if (a.label === 'Derivar a nivel 2') {
+                      setDerivendoN2(true)
+                      setTimeout(() => { setDerivendoN2(false); setDerivadoN2(true) }, 1800)
+                      return
+                    }
+                    if (!bloqueadaImpago && !masiva) ejecutarAccion(a.label)
+                  }}
                   disabled={bloqueadaImpago || !!masiva || cargando}
                   style={{
                     padding: '9px 12px',
@@ -308,11 +354,32 @@ export function AveriasPage() {
                 </div>
               )}
 
-              {!averiaAbierta && !bloqueadaImpago && !masiva && (
-                <button onClick={abrirAveria} disabled={cargando} className="btn-primary" style={{ justifyContent: 'center', marginTop: 4 }}>
-                  {cargando ? <><span className="spinner spinner-sm" /> Abriendo...</> : '+ Abrir avería técnica'}
-                </button>
-              )}
+              {!averiaAbierta && !bloqueadaImpago && !masiva && (() => {
+                const averiaRelacionada = averiaExistente && averiaExistente.estado !== 'resuelta' && grupoSel && averiaExistente.producto?.toLowerCase().includes(grupoSel)
+                if (averiaRelacionada) return (
+                  <div className="fade-in" style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 4 }}>
+                      ⚠ Avería relacionada ya abierta — {averiaExistente.numero}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-amber-dark)', marginBottom: 8 }}>
+                      Existe una avería activa sobre el mismo servicio. Se recomienda actualizarla en lugar de abrir una duplicada.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button style={{ flex: 1, padding: '6px', background: 'var(--color-amber-accent)', color: '#fff', border: 'none', borderRadius: 'var(--border-radius-md)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        Actualizar avería existente
+                      </button>
+                      <button onClick={abrirAveria} disabled={cargando} style={{ padding: '6px 12px', background: 'none', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', borderRadius: 'var(--border-radius-md)', fontSize: 11, cursor: 'pointer' }}>
+                        Abrir nueva igualmente
+                      </button>
+                    </div>
+                  </div>
+                )
+                return (
+                  <button onClick={abrirAveria} disabled={cargando} className="btn-primary" style={{ justifyContent: 'center', marginTop: 4 }}>
+                    {cargando ? <><span className="spinner spinner-sm" /> Abriendo...</> : '+ Abrir avería técnica'}
+                  </button>
+                )
+              })()}
 
               {averiaAbierta && (
                 <div className="alert alert-ok">
@@ -330,7 +397,22 @@ export function AveriasPage() {
         {/* Panel estado técnico */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="card">
-            <div className="card-title">Estado técnico en tiempo real</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Estado técnico en tiempo real
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 10, color: datosFrescos ? 'var(--color-green-dark)' : 'var(--color-amber-dark)', fontWeight: 600 }}>
+                  {datosFrescos ? `✓ Frescos (hace ${minutosDesdeRefresco}m)` : `⚠ Datos > 5m — refrescar`}
+                </span>
+                <button
+                  onClick={refrescar}
+                  disabled={refrescando}
+                  style={{ fontSize: 10, padding: '3px 8px', borderRadius: 'var(--border-radius-full)', border: '1px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {refrescando ? <><span className="spinner spinner-sm" /> Refrescando...</> : '↻ Refrescar'}
+                </button>
+              </div>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {[
                 { label: 'Red fibra / OLT', ok: datos.averias.length === 0, val: datos.averias.length === 0 ? 'OK — señal estable' : 'Señal degradada' },
@@ -349,14 +431,43 @@ export function AveriasPage() {
           {/* Contexto IVR */}
           {averiaExistente && (
             <div className="card card-blue">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <div style={{ width: 20, height: 20, background: 'var(--color-blue-light)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--color-blue-dark)', fontWeight: 700 }}>AI</div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-blue-dark)' }}>Contexto detectado por IVR</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 20, height: 20, background: 'var(--color-blue-light)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--color-blue-dark)', fontWeight: 700 }}>AI</div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-blue-dark)' }}>Contexto IVR transferido</span>
+                </div>
+                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-blue-light)', color: 'var(--color-blue-dark)', border: '1px solid var(--color-blue-mid)', fontWeight: 600 }}>
+                  Hace 2 min
+                </span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-                Cliente con <strong style={{ color: 'var(--color-text-primary)' }}>{averiaExistente.sintoma}</strong>.
-                Estado actual: <strong style={{ color: 'var(--color-text-primary)' }}>{averiaExistente.diagnosticoTecnico}</strong>
+
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+                Intención detectada: <strong style={{ color: 'var(--color-text-primary)' }}>{averiaExistente.sintoma}</strong>
               </div>
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-blue-dark)', marginBottom: 4 }}>Pasos ejecutados:</div>
+              {['Identificación del cliente ✓', 'Verificación estado administrativo ✓', 'Diagnóstico de red automático ✓', 'Detección de masivas ✓'].map((paso, i) => (
+                <div key={i} style={{ fontSize: 11, color: 'var(--color-blue-dark)', display: 'flex', gap: 6, marginBottom: 2 }}>
+                  <span>→</span><span>{paso}</span>
+                </div>
+              ))}
+
+              <button
+                onClick={() => setMostrarDescartes(!mostrarDescartes)}
+                style={{ marginTop: 8, fontSize: 10, color: 'var(--color-blue-dark)', background: 'none', border: '1px solid var(--color-blue-mid)', borderRadius: 'var(--border-radius-md)', padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                {mostrarDescartes ? '▲ Ocultar descartes' : '▼ Ver descartes IVR'}
+              </button>
+
+              {mostrarDescartes && (
+                <div className="fade-in" style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.5)', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-blue-mid)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-blue-dark)', marginBottom: 4 }}>Descartes automáticos IVR:</div>
+                  {['Masiva zonal — descartada (no aplica zona cliente)', 'Reset remoto CPE — ejecutado sin éxito previo', 'Reprovisionado — no ejecutado (pendiente agente)'].map((d, i) => (
+                    <div key={i} style={{ fontSize: 10, color: 'var(--color-text-secondary)', display: 'flex', gap: 4, marginBottom: 2 }}>
+                      <span style={{ color: 'var(--color-red-dark)' }}>✕</span><span>{d}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

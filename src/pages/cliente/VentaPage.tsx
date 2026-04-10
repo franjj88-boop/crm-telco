@@ -9,7 +9,7 @@ import {
 import type { Bundle, ResultadoBusquedaBundle } from '../../types'
 import { NuevaVentaPage } from '../venta/NuevaVentaPage'
 
-type ModoVenta = 'selector' | 'cambio_tarifa' | 'alta_servicio' | 'linea_adicional'
+type ModoVenta = 'selector' | 'cambio_tarifa' | 'alta_servicio' | 'linea_adicional' | 'modo_ahorro'
 
 // ── Colores corporativos ──
 const BLUE = '#0033A0'
@@ -125,6 +125,80 @@ function ModalMigracion({
   )
 }
 
+function ModoAhorroWizard({
+  oportunidades,
+  onVolver,
+  onIrCambioTarifa,
+}: {
+  oportunidades: { id: string; icono: string; titulo: string; desc: string; accion: string; color: string; bg: string; border: string }[]
+  onVolver: () => void
+  onIrCambioTarifa: () => void
+}) {
+  const [accionesHechas, setAccionesHechas] = useState<Set<string>>(new Set())
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>💡 Modo ahorro — Guía de retención</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            Sigue el orden recomendado antes de ejecutar un ajuste de tarifa
+          </div>
+        </div>
+        <button onClick={onVolver} className="btn-secondary" style={{ fontSize: 11 }}>← Volver</button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {oportunidades.map((op, idx) => {
+          const hecha = accionesHechas.has(op.id)
+          return (
+            <div key={op.id} style={{ padding: '14px 16px', border: `1.5px solid ${hecha ? 'var(--color-green-border)' : op.border}`, borderRadius: 'var(--border-radius-lg)', background: hecha ? 'var(--color-green-light)' : op.bg, transition: 'all 0.15s' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: hecha ? 'var(--color-green-border)' : 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: hecha ? 'white' : 'var(--color-text-secondary)', flexShrink: 0 }}>
+                    {hecha ? '✓' : idx + 1}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: hecha ? 'var(--color-green-dark)' : op.color, marginBottom: 4 }}>
+                      {op.icono} {op.titulo}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{op.desc}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 12 }}>
+                  {op.id === 'ajuste' ? (
+                    <button onClick={onIrCambioTarifa} className="btn-secondary" style={{ fontSize: 11 }}>
+                      {op.accion} →
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const s = new Set(accionesHechas)
+                        hecha ? s.delete(op.id) : s.add(op.id)
+                        setAccionesHechas(s)
+                      }}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--border-radius-md)', border: `1px solid ${hecha ? 'var(--color-green-border)' : op.border}`, background: hecha ? 'var(--color-green-border)' : 'white', color: hecha ? 'white' : op.color, cursor: 'pointer', fontWeight: 600 }}>
+                      {hecha ? '✓ Hecho' : 'Marcar hecho'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {accionesHechas.size > 0 && (
+        <div className="alert alert-blue fade-in">
+          <span>📋</span>
+          <div style={{ fontSize: 11 }}>
+            <strong>{accionesHechas.size} acción/es registrada/s</strong> — trazabilidad guardada para el siguiente agente
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function VentaPage() {
   const { clienteActivo, canalActual } = useAppStore()
   const [modo, setModo] = useState<ModoVenta>('selector')
@@ -148,6 +222,7 @@ export function VentaPage() {
 
   // Firma
   const [firmando, setFirmando] = useState(false)
+  const [ventaConscienteVista, setVentaConscienteVista] = useState(false)
   const [firmado, setFirmado] = useState(false)
   const [mostrarMLP, setMostrarMLP] = useState(false)
   const [mlpEmail, setMlpEmail] = useState('')
@@ -287,6 +362,34 @@ export function VentaPage() {
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>Selecciona el tipo de gestión comercial</div>
         </div>
 
+        {/* RF001-15 — Alarmas de entrada */}
+        {(() => {
+          const tienePedidoEnVuelo = clienteActivo.pedidos.some(p => p.estado !== 'completado' && p.estado !== 'cancelado')
+          const tieneMLP = false // En producción vendría del estado de sesión
+          const tieneProcesoAhorro = clienteActivo.satisfaccionRiesgo === 'en_riesgo'
+
+          if (!tienePedidoEnVuelo && !tieneMLP && !tieneProcesoAhorro) return null
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {tienePedidoEnVuelo && (
+                <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                    <strong>⚠ Pedido en vuelo activo</strong> — {clienteActivo.pedidos.find(p => p.estado !== 'completado' && p.estado !== 'cancelado')?.numero}. Algunas acciones pueden estar bloqueadas hasta su resolución.
+                  </div>
+                  <button onClick={() => window.history.pushState(null, '', `/cliente/${clienteActivo.id}/pedidos`)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 9999, border: '1px solid var(--color-blue-mid)', background: 'white', color: 'var(--color-blue-dark)', cursor: 'pointer', fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>
+                    Ver →
+                  </button>
+                </div>
+              )}
+              {tieneProcesoAhorro && (
+                <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)' }}>
+                  <strong>💡 Cliente en proceso de revisión de ahorro</strong> — Priorizar propuestas de valor antes de cambios de tarifa.
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {tieneFusion && (
           <div style={{ background: ORANGE_LIGHT, border: `1.5px solid ${ORANGE_BORDER}`, borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <span style={{ fontSize: 16, flexShrink: 0 }}>🔶</span>
@@ -315,12 +418,52 @@ export function VentaPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          {([
+        {/* RF001-16 — Beneficios condicionados no automáticos */}
+        {(() => {
+          const tieneMultisim = clienteActivo.lineasMovil.length >= 2
+          const beneficiosPendientes = []
+          if (!tieneMultisim && clienteActivo.lineasMovil.length === 1) {
+            beneficiosPendientes.push({
+              id: 'multisim',
+              titulo: 'Multisim sin coste disponible',
+              desc: 'El cliente puede añadir una SIM adicional vinculada a su línea principal sin coste extra. Requiere solicitud explícita.',
+              icono: '📶',
+            })
+          }
+          if (clienteActivo.porfolio === 'mi_movistar' && !clienteActivo.productos.some(p => p.tipo === 'tv')) {
+            beneficiosPendientes.push({
+              id: 'tv',
+              titulo: 'TV Movistar Plus+ disponible',
+              desc: 'El cliente puede añadir TV a su bundle convergente. No se aplica automáticamente.',
+              icono: '📺',
+            })
+          }
+          if (beneficiosPendientes.length === 0) return null
+          return (
+            <div style={{ padding: '10px 14px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-green-dark)', marginBottom: 8 }}>
+                🎁 Beneficios disponibles — requieren solicitud explícita del agente
+              </div>
+              {beneficiosPendientes.map(b => (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6, fontSize: 11, color: 'var(--color-green-dark)' }}>
+                  <span style={{ flexShrink: 0 }}>{b.icono}</span>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{b.titulo}</div>
+                    <div style={{ opacity: 0.85, marginTop: 2 }}>{b.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[
             { modo: 'cambio_tarifa' as ModoVenta, icono: '🔄', titulo: 'Cambiar tarifa', desc: 'Reposicionar en un bundle diferente. El sistema parte de la tarifa actual y busca alternativas.', color: BLUE, bgColor: BLUE_LIGHT, border: BLUE_BORDER },
             { modo: 'alta_servicio' as ModoVenta, icono: '➕', titulo: 'Alta de servicio', desc: 'Alta línea Móvil o BAF / BAF Convergente. Mismo proceso que nueva contratación con datos precargados.', color: 'var(--color-green)', bgColor: 'var(--color-green-light)', border: 'var(--color-green-border)' },
             { modo: 'linea_adicional' as ModoVenta, icono: '📱', titulo: 'Añadir línea', desc: 'Añadir una línea móvil adicional sobre el bundle convergente actual.', color: 'var(--color-purple)', bgColor: 'var(--color-purple-light)', border: 'var(--color-purple-border)' },
-          ] as const).map(op => (
+            { modo: 'modo_ahorro' as ModoVenta, icono: '💡', titulo: 'Modo ahorro', desc: 'Wizard guiado para clientes en riesgo. Prioriza acciones de retención y ajuste de tarifa.', color: 'var(--color-amber)', bgColor: 'var(--color-amber-light)', border: 'var(--color-amber-border)' },
+          ].map(op => (
             <div key={op.modo} onClick={() => iniciarModo(op.modo)}
               style={{ background: op.bgColor, border: `1.5px solid ${op.border}`, borderRadius: 'var(--border-radius-lg)', padding: 16, cursor: 'pointer', transition: 'box-shadow 0.15s', boxShadow: 'var(--shadow-sm)' }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'}
@@ -333,6 +476,53 @@ export function VentaPage() {
         </div>
       </>
     )
+  }
+
+  // ── MODO AHORRO (RF001-13 RepoDown) ──
+  if (modo === 'modo_ahorro') {
+    const oportunidades = [
+      {
+        id: 'valor',
+        icono: '✨',
+        titulo: 'Poner en valor el servicio',
+        desc: 'Recordar al cliente los beneficios de su tarifa actual: velocidad, datos, TV incluida.',
+        accion: 'Argumentar beneficios',
+        color: 'var(--color-blue)',
+        bg: 'var(--color-blue-light)',
+        border: 'var(--color-blue-mid)',
+      },
+      {
+        id: 'va',
+        icono: '🔍',
+        titulo: 'Revisar servicios de valor añadido',
+        desc: 'Identificar servicios que no usa (seguros, roaming) y eliminarlos para reducir cuota.',
+        accion: 'Revisar parque',
+        color: 'var(--color-amber)',
+        bg: 'var(--color-amber-light)',
+        border: 'var(--color-amber-border)',
+      },
+      {
+        id: 'promo',
+        icono: '🎁',
+        titulo: 'Aplicar promoción de prevención',
+        desc: 'Ofrecer descuento temporal de retención si el cliente cumple criterios.',
+        accion: 'Ver promociones',
+        color: 'var(--color-green)',
+        bg: 'var(--color-green-light)',
+        border: 'var(--color-green-border)',
+      },
+      {
+        id: 'ajuste',
+        icono: '📉',
+        titulo: 'Ajuste de tarifa (RepoDown)',
+        desc: 'Migrar a una tarifa inferior manteniendo el cliente. Registra como retención activa.',
+        accion: 'Ir a cambio tarifa',
+        color: 'var(--color-red)',
+        bg: 'var(--color-red-light)',
+        border: 'var(--color-red-border)',
+      },
+    ]
+    return <ModoAhorroWizard oportunidades={oportunidades} onVolver={resetear} onIrCambioTarifa={() => iniciarModo('cambio_tarifa')} />
   }
 
   // ── LÍNEA ADICIONAL ──
@@ -516,7 +706,11 @@ export function VentaPage() {
                             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{r.bundle.descripcion}</div>
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{r.bundle.precio.toFixed(2)}€</div>
+                            <div>
+                              <span style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>{r.bundle.precio.toFixed(2)}€</span>
+                              <span style={{ fontSize: 11, color: '#6B7280' }}>/mes sin IVA</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: '#6B7280' }}>({(r.bundle.precio * 1.21).toFixed(2)}€ con IVA)</div>
                             {!esMismoBundle && bundleActualObj && (
                               <div style={{ fontSize: 11, fontWeight: 600, color: delta > 0 ? 'var(--color-red)' : 'var(--color-green)' }}>
                                 {delta > 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(2)}€/mes
@@ -529,6 +723,27 @@ export function VentaPage() {
                           {r.bundle.tag && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-purple-light)', border: '1px solid var(--color-purple-border)', color: 'var(--color-purple)', fontWeight: 600 }}>{r.bundle.tag}</span>}
                           {r.matchTipo === 'exacto' && !esMismoBundle && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, color: BLUE, fontWeight: 600 }}>⭐ NBA</span>}
                         </div>
+                        {/* Diferencias detectadas — Sección 7.2 */}
+                        {r.matchTipo !== 'exacto' && (() => {
+                          const diffs: string[] = []
+                          const b = r.bundle
+                          if (b.ingredientes.fibra && fibraSel && b.ingredientes.fibra !== fibraSel) {
+                            diffs.push(`Fibra: ${b.ingredientes.fibra}Mb ofrecida vs ${fibraSel}Mb pedida`)
+                          }
+                          if (b.ingredientes.lineas?.[0]?.datos && datosPrincipal && b.ingredientes.lineas[0].datos !== datosPrincipal) {
+                            diffs.push(`Línea 1: ${b.ingredientes.lineas[0].datos} vs ${datosPrincipal} pedidos`)
+                          }
+                          if (diffs.length === 0) return null
+                          return (
+                            <div style={{ marginTop: 6 }}>
+                              {diffs.map((d, i) => (
+                                <div key={i} style={{ fontSize: 10, color: '#92400E', display: 'flex', gap: 4 }}>
+                                  <span>⚠</span><span>{d}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
                         {r.diferencias.length > 0 && (
                           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--color-border-tertiary)' }}>
                             {r.diferencias.map((d, i) => <div key={i} style={{ fontSize: 11, color: 'var(--color-amber-dark)' }}>· {d}</div>)}
@@ -600,7 +815,13 @@ export function VentaPage() {
                         {descuentoBundle > 0 && sel && <div style={{ fontSize: 9, color: '#166534', fontWeight: 700, marginTop: 2 }}>✓ Descuento bundle −{descuentoBundle}€ aplicado</div>}
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        {descuentoBundle > 0 ? (
+                        {bundleSel && bundleSel.categoria.startsWith('convergente') && addon.precioBundle !== undefined && addon.precioBundle < addon.precio ? (
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-green-dark)' }}>+{addon.precioBundle}€/mes</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textDecoration: 'line-through' }}>{addon.precio}€ a la carta</div>
+                            <div style={{ fontSize: 9, color: 'var(--color-green-dark)', fontWeight: 600 }}>Precio bundle</div>
+                          </div>
+                        ) : descuentoBundle > 0 ? (
                           <div>
                             <span style={{ fontSize: 11, textDecoration: 'line-through', color: 'var(--color-text-tertiary)', marginRight: 4 }}>{addon.precio}€</span>
                             <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#166534' }}>+{precioEfectivo}€</span>
@@ -641,6 +862,43 @@ export function VentaPage() {
               )}
             </div>
           )}
+
+          {/* RF001-7 — Productos relacionados dinámicos según cesta */}
+          {bundleSel && (() => {
+            const relacionados: { id: string; icono: string; titulo: string; desc: string; tipo: string }[] = []
+            if (bundleSel.categoria.startsWith('convergente') && addonsTVSel.size === 0) {
+              relacionados.push({ id: 'tv', icono: '📺', titulo: 'Añadir paquete de TV', desc: 'El cliente tiene fibra + móvil pero no TV. Oportunidad de upsell.', tipo: 'contratable' })
+            }
+            if (bundleSel.ingredientes.lineas && bundleSel.ingredientes.lineas.length > 0) {
+              relacionados.push({ id: 'seguro', icono: '🛡', titulo: 'Seguro de móvil', desc: 'Protección ante rotura o robo. 5,99€/mes.', tipo: 'contratable' })
+            }
+            if (bundleSel.ingredientes.fibra) {
+              relacionados.push({ id: 'fttr', icono: '🔧', titulo: 'FTTR — Fibra hasta la habitación', desc: '+12€/mes. Señalización instalación incluida.', tipo: 'senalizable' })
+            }
+            if (relacionados.length === 0) return null
+            return (
+              <div className="card">
+                <div className="card-title">🔗 Productos relacionados</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+                  Actualizados según la cesta actual
+                </div>
+                {relacionados.map(r => (
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--color-border-tertiary)', fontSize: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 16 }}>{r.icono}</span>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{r.titulo}</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{r.desc}</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 9999, fontWeight: 700, background: r.tipo === 'contratable' ? 'var(--color-green-light)' : 'var(--color-amber-light)', color: r.tipo === 'contratable' ? 'var(--color-green-dark)' : 'var(--color-amber-dark)', border: `1px solid ${r.tipo === 'contratable' ? 'var(--color-green-border)' : 'var(--color-amber-border)'}`, flexShrink: 0, marginLeft: 8 }}>
+                      {r.tipo === 'contratable' ? 'AÑADIR' : 'SEÑALIZAR'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
 
           {/* RF01-4: Señalización de productos de terceros */}
           {bundleSel && (
@@ -743,6 +1001,26 @@ export function VentaPage() {
                   </div>
                 )}
 
+                {!firmado && (
+                  <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: ventaConscienteVista ? 'var(--color-green-light)' : 'var(--color-background-secondary)', border: `1px solid ${ventaConscienteVista ? 'var(--color-green-border)' : 'var(--color-border-secondary)'}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: ventaConscienteVista ? 'var(--color-green-dark)' : 'var(--color-text-primary)', marginBottom: 6 }}>
+                      💬 Venta consciente
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+                      Informa al cliente del nuevo precio ({(precioTotal() * 1.21).toFixed(2)}€/mes con IVA), condiciones de permanencia y derecho de desistimiento de 14 días.
+                    </div>
+                    {!ventaConscienteVista ? (
+                      <button
+                        onClick={() => setVentaConscienteVista(true)}
+                        style={{ width: '100%', padding: '6px', background: 'var(--color-green-border)', color: '#fff', border: 'none', borderRadius: 'var(--border-radius-md)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        ✓ He verbalizado los términos al cliente — continuar con OTP
+                      </button>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'var(--color-green-dark)', fontWeight: 600 }}>✓ Términos verbalizados</div>
+                    )}
+                  </div>
+                )}
+
                 {firmado ? (
                   <div className="alert alert-ok">
                     <span>✓</span>
@@ -756,9 +1034,14 @@ export function VentaPage() {
                   </div>
                 ) : (
                   <>
-                    <button onClick={firmar} disabled={firmando} className="btn-primary" style={{ width: '100%', justifyContent: 'center', height: 36, fontSize: 13, marginBottom: 6 }}>
+                    <button onClick={firmar} disabled={!ventaConscienteVista || firmando} className="btn-primary" style={{ width: '100%', justifyContent: 'center', height: 36, fontSize: 13, marginBottom: 6 }}>
                       {firmando ? <><span className="spinner spinner-sm" /> Enviando OTP...</> : '🔐 Firmar con OTP'}
                     </button>
+                    {!ventaConscienteVista && (
+                      <div style={{ fontSize: 10, color: 'var(--color-amber-dark)', marginTop: 4, textAlign: 'center' }}>
+                        ⚠ RN-CONF-15: Verbaliza los términos al cliente antes de solicitar OTP
+                      </div>
+                    )}
                     <button onClick={() => { setMlpEmail(clienteActivo.email || ''); setMostrarMLP(true) }} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
                       📄 Me lo pienso (MLP)
                     </button>

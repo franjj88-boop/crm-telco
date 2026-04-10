@@ -257,6 +257,12 @@ export function ClienteLayout() {
                 <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {cliente.nombre} {cliente.apellidos}
                 </div>
+                {/* RF-PI-01 RN-PI-08 — Diferenciación titular vs representante */}
+                {(cliente as any).llamanteRepresentante && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 10, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                    👤 Representante autorizado — actúa en nombre del titular
+                  </div>
+                )}
                 <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{cliente.dni}</div>
               </div>
             </div>

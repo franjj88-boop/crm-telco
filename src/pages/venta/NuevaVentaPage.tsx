@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { catalogoBundles, catalogoAddonsTV, catalogoDispositivos, buscarBundles, catalogoTerceros, crearSenalizacion, compatibilidadTV, addonsTVCore } from '../../data/mockData'
+import { catalogoBundles, catalogoAddonsTV, catalogoDispositivos, buscarBundles, catalogoTerceros, crearSenalizacion, compatibilidadTV, addonsTVCore, focosComerciales, argumentarioNBA } from '../../data/mockData'
+import { useAppStore } from '../../store/useAppStore'
 import type { Bundle, ResultadoBusquedaBundle, Dispositivo } from '../../types'
 
 type Paso = 1 | 2 | 3 | 4 | 5
@@ -54,6 +55,7 @@ type NuevaVentaProps = {
 
 export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaProps = {}) {
   const navigate = useNavigate()
+  const { canalActual } = useAppStore()
   const [paso, setPaso] = useState<Paso>(tipoForzado ? 2 : 1)
   const [tipoAlta, setTipoAlta] = useState<TipoAlta>(tipoForzado || null)
 
@@ -117,6 +119,10 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
   // Firma paso 5
   const [firmando, setFirmando] = useState(false)
   const [firmado, setFirmado] = useState(false)
+
+  // UI extras
+  const [mostrarCalculadora, setMostrarCalculadora] = useState(false)
+  const [modoAutonomo, setModoAutonomo] = useState(false)
 
   // Precios
   const precioBundle = bundleSel?.precio || 0
@@ -325,12 +331,61 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
           })}
         </div>
 
-        {bundleSel && (
-          <div style={{ fontSize: 12, padding: '6px 14px', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 20, color: BLUE, fontWeight: 600 }}>
-            {bundleSel.nombre} · {(precioConIVA).toFixed(0)}€/mes
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {bundleSel && (
+            <div style={{ fontSize: 12, padding: '6px 14px', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 20, color: BLUE, fontWeight: 600 }}>
+              {bundleSel.nombre} · {(precioConIVA).toFixed(0)}€/mes
+            </div>
+          )}
+          <button onClick={() => setMostrarCalculadora(v => !v)}
+            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, background: mostrarCalculadora ? '#111827' : 'white', color: mostrarCalculadora ? 'white' : '#374151', border: '1px solid #D1D5DB', borderRadius: 20, cursor: 'pointer', transition: 'all 0.15s' }}>
+            📊 Calculadora
+          </button>
+        </div>
       </div>
+
+      {/* Calculadora desplegable */}
+      {mostrarCalculadora && (
+        <div style={{ position: 'sticky', top: 57, zIndex: 40, background: '#1E293B', borderBottom: '1px solid #334155', padding: '12px 24px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Calculadora de precio</div>
+            <div style={{ display: 'flex', gap: 24, flex: 1, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase' }}>Bundle</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>{bundleSel ? `${bundleSel.precio.toFixed(2)}€` : '—'}</span>
+              </div>
+              {catalogoAddonsTV.filter(a => addonsSel.has(a.id)).map(a => (
+                <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase' }}>{a.nombre}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>+{a.precio.toFixed(2)}€</span>
+                </div>
+              ))}
+              {fttr === 'con-instalacion' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase' }}>FTTR</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>+12.00€</span>
+                </div>
+              )}
+              {dispositivoSel && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase' }}>{dispositivoSel.marca} {dispositivoSel.modelo}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>+{cuotaDisp.toFixed(2)}€</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 24, alignItems: 'baseline' }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase' }}>Sin IVA</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#94A3B8' }}>{(precioTotal + cuotaDisp).toFixed(2)}€/mes</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase' }}>Con IVA (21%)</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#F8FAFC' }}>{(precioConIVA + cuotaDisp * 1.21).toFixed(0)}€/mes</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
 
@@ -437,6 +492,32 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                 </div>
               )}
 
+              {/* RF20260327-11: Focos comerciales por canal */}
+              {(() => {
+                const focos = focosComerciales.filter(f => f.activo && f.canal.includes(canalActual as string))
+                if (focos.length === 0) return null
+                return (
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      🎯 Focos comerciales activos
+                      <span style={{ fontSize: 10, padding: '2px 8px', background: '#F3F4F6', borderRadius: 9999, color: '#6B7280' }}>{canalActual}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {focos.map(foco => (
+                        <div key={foco.id} style={{ flex: '1 1 200px', padding: '12px 14px', border: `1.5px solid ${foco.color}20`, borderRadius: 10, background: `${foco.color}08` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                            <span style={{ fontSize: 20 }}>{foco.icono}</span>
+                            <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 9999, background: foco.color, color: 'white', fontWeight: 700 }}>{foco.badge}</span>
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: foco.color, marginBottom: 4 }}>{foco.titulo}</div>
+                          <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.5 }}>{foco.descripcion}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Configurador tarifa */}
               {(esSoloMovil || cob.verificada) && (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -456,6 +537,28 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                       </div>
                     </div>
                   )}
+
+                  {/* RF20260327-12: Segmentación autónomos */}
+                  <div style={{ marginBottom: 20, padding: '12px 16px', background: modoAutonomo ? '#EFF6FF' : '#F9FAFB', border: `1.5px solid ${modoAutonomo ? '#BFDBFE' : '#E5E7EB'}`, borderRadius: 10, transition: 'all 0.15s' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={modoAutonomo} onChange={e => setModoAutonomo(e.target.checked)}
+                        style={{ width: 16, height: 16, accentColor: BLUE, cursor: 'pointer' }} />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: modoAutonomo ? BLUE : '#374151' }}>
+                          🧾 Cliente autónomo / profesional
+                        </div>
+                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
+                          Activa opciones de facturación y líneas profesionales para autónomos y empresas unipersonales
+                        </div>
+                      </div>
+                    </label>
+                    {modoAutonomo && (
+                      <div style={{ marginTop: 10, padding: '8px 12px', background: '#DBEAFE', borderRadius: 8, fontSize: 12, color: '#1E40AF', lineHeight: 1.6 }}>
+                        ℹ️ Modo autónomo activo — se habilitará factura con NIF profesional y descuento IVA deducible.
+                        Las líneas móviles incluirán opción de detalle de llamadas para contabilidad.
+                      </div>
+                    )}
+                  </div>
 
                   {/* Líneas */}
                   <div style={{ marginBottom: 20 }}>
@@ -517,33 +620,82 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                     </div>
                   </div>
 
-                  {/* NBA propuesta destacada */}
+                  {/* RF20260327-3: Doble resultado NBA */}
                   {resultados.length > 0 && (() => {
-                    const nba = resultados.find(r => r.matchTipo === 'exacto') || resultados[0]
+                    const exacto = resultados.find(r => r.matchTipo === 'exacto') || resultados[0]
+                    const nba = resultados.find(r => r.bundle.id !== exacto.bundle.id && r.matchTipo !== 'parcial') || (resultados.length > 1 ? resultados[1] : null)
+                    const argExacto = argumentarioNBA[exacto.bundle.id]
+                    const argNba = nba ? argumentarioNBA[nba.bundle.id] : null
                     return (
-                      <div style={{ marginBottom: 16, padding: '14px 16px', background: BLUE_LIGHT, border: `1.5px solid ${BLUE_BORDER}`, borderRadius: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: BLUE, color: 'white', fontWeight: 700 }}>⭐ NBA Recomendado</span>
-                          <span style={{ fontSize: 12, color: '#374151' }}>Mejor opción para este cliente</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{nba.bundle.nombre}</div>
-                            <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                              {nba.diferencias.length === 0 ? 'Match perfecto con lo solicitado' : `Ajuste: ${nba.diferencias[0]}`}
+                      <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column' }}>
+                        {/* Propuesta 1 — Lo solicitado */}
+                        <div style={{ padding: '14px 16px', background: BLUE_LIGHT, border: `1.5px solid ${BLUE_BORDER}`, borderRadius: '10px 10px 0 0', borderBottom: 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: BLUE, color: 'white', fontWeight: 700 }}>📋 Propuesta 1</span>
+                            <span style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>Lo solicitado</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{exacto.bundle.nombre}</div>
+                              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                                {exacto.diferencias.length === 0 ? 'Match perfecto con lo solicitado' : `Ajuste: ${exacto.diferencias[0]}`}
+                              </div>
+                              {argExacto && (
+                                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                  {argExacto.beneficios.map((b, i) => (
+                                    <div key={i} style={{ fontSize: 11, color: '#374151' }}>✓ {b}</div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic', marginTop: 4 }}>
-                              💬 "{nba.bundle.categoria.includes('convergente') ? 'Solución completa optimizada para este perfil' : 'Tarifa móvil ajustada al consumo del cliente'}"
+                            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                              <div style={{ fontSize: 20, fontWeight: 700, color: BLUE }}>{(exacto.bundle.precio * 1.21).toFixed(0)}€/mes</div>
+                              <button onClick={() => setBundleSel(exacto.bundle)}
+                                style={{ marginTop: 6, padding: '6px 16px', background: BLUE, color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                Seleccionar
+                              </button>
                             </div>
                           </div>
-                          <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: BLUE }}>{(nba.bundle.precio * 1.21).toFixed(0)}€/mes</div>
-                            <button onClick={() => setBundleSel(nba.bundle)}
-                              style={{ marginTop: 6, padding: '6px 16px', background: BLUE, color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              Seleccionar
-                            </button>
-                          </div>
                         </div>
+
+                        {/* Propuesta 2 — NBA recomendada */}
+                        {nba && (
+                          <div style={{ padding: '14px 16px', background: '#FFF7ED', border: '1.5px solid #FED7AA', borderRadius: '0 0 10px 10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#EA580C', color: 'white', fontWeight: 700 }}>⭐ Propuesta 2</span>
+                              <span style={{ fontSize: 12, color: '#7C2D12', fontWeight: 600 }}>NBA recomendada</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#EA580C' }}>{nba.bundle.nombre}</div>
+                                {argNba && (
+                                  <>
+                                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                      {argNba.beneficios.map((b, i) => (
+                                        <div key={i} style={{ fontSize: 11, color: '#374151' }}>✓ {b}</div>
+                                      ))}
+                                    </div>
+                                    <div style={{ marginTop: 8, fontSize: 11, color: '#92400E', fontStyle: 'italic', lineHeight: 1.5 }}>
+                                      💬 "{argNba.comparativa}"
+                                    </div>
+                                    {argNba.ahorroPrecio && (
+                                      <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: '#166534' }}>
+                                        💰 Ahorro potencial: {argNba.ahorroPrecio}€/mes
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                                <div style={{ fontSize: 20, fontWeight: 700, color: '#EA580C' }}>{(nba.bundle.precio * 1.21).toFixed(0)}€/mes</div>
+                                <button onClick={() => setBundleSel(nba.bundle)}
+                                  style={{ marginTop: 6, padding: '6px 16px', background: '#EA580C', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                  Seleccionar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })()}

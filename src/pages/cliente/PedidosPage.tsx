@@ -9,8 +9,11 @@ export function PedidosPage() {
   const [notificando, setNotificando] = useState(false)
   const [pedidoActivoId, setPedidoActivoId] = useState<string | null>(null)
   const [vistaHistorial, setVistaHistorial] = useState(false)
-  const [escalando, setEscalando] = useState(false)
-  const [escalado, setEscalado] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [busquedaActiva, setBusquedaActiva] = useState(false)
+  const [mostrarITSM, setMostrarITSM] = useState(false)
+  const [accionITSM, setAccionITSM] = useState<string | null>(null)
+  const [itsmEjecutado, setItsmEjecutado] = useState(false)
 
   if (!id) return null
   const datos = datosCliente[id]
@@ -26,11 +29,6 @@ export function PedidosPage() {
   const notificar = () => {
     setNotificando(true)
     setTimeout(() => { setNotificando(false); setNotificado(true); setTimeout(() => setNotificado(false), 3500) }, 1500)
-  }
-
-  const escalar = () => {
-    setEscalando(true)
-    setTimeout(() => { setEscalando(false); setEscalado(true) }, 1800)
   }
 
   const estadoColor = (e: string) => {
@@ -68,6 +66,63 @@ export function PedidosPage() {
           </div>
         </div>
       </div>
+
+      {/* RF-SEG-PED-02 — Búsqueda por múltiples claves */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && setBusquedaActiva(true)}
+          placeholder="Buscar por ID pedido, teléfono, email, MLP..."
+          className="input"
+          style={{ flex: 1, height: 34 }}
+        />
+        <button
+          onClick={() => setBusquedaActiva(!!busqueda.trim())}
+          className="btn-secondary"
+          style={{ fontSize: 11, height: 34 }}>
+          🔍 Buscar
+        </button>
+        {busquedaActiva && (
+          <button onClick={() => { setBusqueda(''); setBusquedaActiva(false) }} className="btn-ghost" style={{ fontSize: 11 }}>
+            ✕ Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Resultado búsqueda simulado */}
+      {busquedaActiva && busqueda.trim() && (
+        <div className="card fade-in" style={{ border: '1.5px solid var(--color-blue-mid)', background: 'var(--color-blue-light)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)', marginBottom: 8 }}>
+            Resultados para "{busqueda}"
+          </div>
+          {datos.pedidos.filter(p =>
+            p.numero.toLowerCase().includes(busqueda.toLowerCase()) ||
+            p.producto.toLowerCase().includes(busqueda.toLowerCase()) ||
+            busqueda.toLowerCase().includes('@') ||
+            !!busqueda.match(/^\d{9}$/)
+          ).length > 0 ? (
+            datos.pedidos.map(p => (
+              <div key={p.id}
+                onClick={() => { setPedidoActivoId(p.id); setBusquedaActiva(false); setBusqueda(''); setVistaHistorial(false) }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.7)', border: '1px solid var(--color-blue-mid)', cursor: 'pointer', marginBottom: 4 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-blue-dark)' }}>{p.numero}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{p.producto} · {p.tipo}</div>
+                </div>
+                <span className={`pill ${estadoColor(p.estado)}`} style={{ fontSize: 10 }}>{p.estado.replace(/_/g, ' ')}</span>
+              </div>
+            ))
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '8px 0' }}>
+              Sin resultados. Comprueba el identificador introducido.
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 6, fontStyle: 'italic' }}>
+            Búsqueda por: ID pedido · teléfono · email · MLP · dirección
+          </div>
+        </div>
+      )}
 
       {datos.pedidos.length === 0 ? (
         <div style={{ background: 'var(--color-background-primary)', border: '1px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: 32, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 12 }}>
@@ -111,12 +166,6 @@ export function PedidosPage() {
               <span style={{ fontWeight: 600 }}>Estado enviado al cliente por SMS y email</span>
             </div>
           )}
-          {escalado && (
-            <div className="alert alert-warn fade-in">
-              <span>⚠</span>
-              <span style={{ fontWeight: 600 }}>Incidencia escalada al equipo de soporte técnico</span>
-            </div>
-          )}
 
           {/* ─── VISTA HISTORIAL ─── */}
           {vistaHistorial ? (
@@ -158,6 +207,52 @@ export function PedidosPage() {
                 </div>
               )}
 
+              {/* RF-SEG-PED-01 RN-11 — Alarmas jerárquicas */}
+              {(() => {
+                const pedidoEnVuelo = pedidosActivos.find(p => p.estado !== 'prepedido')
+                const prepedidoBloqueo = pedidosActivos.find(p => p.estado === 'prepedido')
+                const enIncidencia = pedidosActivos.find(p => p.estado === 'en_incidencia')
+
+                if (!pedidoEnVuelo && !prepedidoBloqueo && !enIncidencia) return null
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {pedidoEnVuelo && (
+                      <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1.5px solid var(--color-blue-mid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                          <strong>📦 Pedido en vuelo</strong> — {pedidoEnVuelo.numero} · {pedidoEnVuelo.proximoHito}
+                        </div>
+                        <button onClick={() => { setPedidoActivoId(pedidoEnVuelo.id); setVistaHistorial(false) }}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 9999, border: '1px solid var(--color-blue-mid)', background: 'white', color: 'var(--color-blue-dark)', cursor: 'pointer', fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>
+                          Ver →
+                        </button>
+                      </div>
+                    )}
+                    {enIncidencia && (
+                      <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-red-light)', border: '1.5px solid var(--color-red-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-red-dark)' }}>
+                          <strong>⚠ Incidencia bloqueante</strong> — {enIncidencia.numero} requiere atención
+                        </div>
+                        <button onClick={() => { setPedidoActivoId(enIncidencia.id); setVistaHistorial(false) }}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 9999, border: '1px solid var(--color-red-border)', background: 'white', color: 'var(--color-red-dark)', cursor: 'pointer', fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>
+                          Gestionar →
+                        </button>
+                      </div>
+                    )}
+                    {prepedidoBloqueo && !pedidoEnVuelo && (
+                      <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-amber-dark)' }}>
+                          <strong>⏳ Prepedido pendiente</strong> — {prepedidoBloqueo.numero} · Revisar bloqueos
+                        </div>
+                        <button onClick={() => { setPedidoActivoId(prepedidoBloqueo.id); setVistaHistorial(false) }}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 9999, border: '1px solid var(--color-amber-border)', background: 'white', color: 'var(--color-amber-dark)', cursor: 'pointer', fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>
+                          Revisar →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {pedidosActivos.length === 0 && (
                 <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-tertiary)', fontSize: 12 }}>
                   No hay pedidos activos en este momento.
@@ -177,6 +272,36 @@ export function PedidosPage() {
                           {pedidoSel.numero}
                           <span className={`pill ${estadoColor(pedidoSel.estado)}`}>{pedidoSel.estado.replace(/_/g, ' ')}</span>
                         </div>
+
+                        {/* RF-SEG-PED-03 — Vista prepedido con bloqueos */}
+                        {pedidoSel.estado === 'prepedido' && (
+                          <div className="fade-in" style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 8 }}>
+                              ⏳ Prepedido — Pendiente de validaciones
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              {[
+                                { check: true, label: 'Identificación del cliente', desc: 'DNI/NIF verificado' },
+                                { check: false, label: 'Dirección validada', desc: 'Pendiente — verificar numeración de entrada' },
+                                { check: false, label: 'Cobertura verificada', desc: 'Pendiente — confirmar disponibilidad en zona' },
+                                { check: true, label: 'Oferta configurada', desc: 'Producto seleccionado y precio confirmado' },
+                              ].map((item, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11 }}>
+                                  <span style={{ color: item.check ? 'var(--color-green-dark)' : 'var(--color-red-dark)', fontWeight: 700, flexShrink: 0 }}>
+                                    {item.check ? '✓' : '✕'}
+                                  </span>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: item.check ? 'var(--color-green-dark)' : 'var(--color-red-dark)' }}>{item.label}</div>
+                                    <div style={{ color: 'var(--color-text-tertiary)', fontSize: 10 }}>{item.desc}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <button style={{ marginTop: 10, width: '100%', padding: '7px', background: 'var(--color-amber-accent)', color: '#fff', border: 'none', borderRadius: 'var(--border-radius-md)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                              Completar validaciones → Emitir pedido
+                            </button>
+                          </div>
+                        )}
 
                         {/* Barra de progreso */}
                         <div style={{ marginBottom: 12 }}>
@@ -227,7 +352,7 @@ export function PedidosPage() {
                             {[
                               { label: 'Fecha', val: pedidoSel.citaFecha },
                               { label: 'Hora', val: pedidoSel.citaHora || '—' },
-                              { label: 'Técnico', val: pedidoSel.citaAgente || '—' },
+                              { label: 'Técnico', val: pedidoSel.citaAgente ? pedidoSel.citaAgente.split(' ')[0] : '—' },
                             ].map(row => (
                               <div key={row.label} style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 'var(--border-radius-md)', padding: '8px 10px' }}>
                                 <div style={{ fontSize: 10, color: 'var(--color-blue-dark)', opacity: 0.7, marginBottom: 2 }}>{row.label}</div>
@@ -256,13 +381,62 @@ export function PedidosPage() {
                       )}
 
                       {/* Acciones */}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={notificar} disabled={notificando} className="btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
-                          {notificando ? <><span className="spinner spinner-sm" /> Enviando...</> : '📱 Enviar estado por SMS'}
-                        </button>
-                        <button onClick={escalar} disabled={escalando || escalado} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
-                          {escalando ? <><span className="spinner spinner-sm" /> Escalando...</> : escalado ? '✓ Escalado' : '⚠ Escalar incidencia'}
-                        </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={notificar} disabled={notificando} className="btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
+                            {notificando ? <><span className="spinner spinner-sm" /> Enviando...</> : '📱 Enviar estado por SMS'}
+                          </button>
+                          <button onClick={() => setMostrarITSM(!mostrarITSM)} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
+                            🔧 Gestión ITSM
+                          </button>
+                        </div>
+
+                        {/* RF-SEG-PED-05 — Panel gestión ITSM */}
+                        {mostrarITSM && (
+                          <div className="fade-in" style={{ padding: '12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-secondary)' }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 10 }}>
+                              Gestión de incidencias ITSM
+                            </div>
+                            {itsmEjecutado ? (
+                              <div className="alert alert-ok fade-in">
+                                <span>✓</span>
+                                <div>
+                                  <div style={{ fontWeight: 600 }}>{accionITSM} — ejecutado</div>
+                                  <div style={{ fontSize: 10, marginTop: 2 }}>Trazabilidad: {new Date().toLocaleString('es-ES')} · Vinculado a {pedidoSel.numero}</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {[
+                                  { id: 'abrir', label: '+ Abrir incidencia ITSM', desc: 'Nueva incidencia vinculada al pedido', color: 'var(--color-blue)' },
+                                  { id: 'actualizar', label: '✎ Actualizar incidencia', desc: 'Añadir nota o cambiar estado', color: 'var(--color-text-secondary)' },
+                                  { id: 'escalar', label: '⬆ Escalar a N2', desc: 'Derivar a técnico especialista con contexto completo', color: 'var(--color-amber-dark)' },
+                                  { id: 'cerrar', label: '✓ Cerrar incidencia', desc: 'Marcar como resuelta y registrar cierre', color: 'var(--color-green-dark)' },
+                                ].map(a => (
+                                  <button key={a.id}
+                                    onClick={() => {
+                                      setAccionITSM(a.label)
+                                      setTimeout(() => setItsmEjecutado(true), 1500)
+                                    }}
+                                    style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-tertiary)', background: 'var(--color-background-primary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: 8, alignItems: 'flex-start', fontFamily: 'var(--font-sans)' }}>
+                                    <div>
+                                      <div style={{ fontWeight: 600, color: a.color }}>{a.label}</div>
+                                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{a.desc}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Aviso incidencia bloqueante */}
+                        {pedidoSel.estado === 'en_incidencia' && (
+                          <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-red-light)', border: '1.5px solid var(--color-red-border)', fontSize: 11, color: 'var(--color-red-dark)' }}>
+                            <div style={{ fontWeight: 700, marginBottom: 3 }}>⚠ Incidencia bloqueante activa</div>
+                            <div>Este pedido tiene una incidencia que bloquea la provisión. Gestionar desde el panel ITSM o escalar a N2.</div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

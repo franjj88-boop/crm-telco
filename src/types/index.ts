@@ -151,6 +151,7 @@ export interface AddonTV {
   id: string
   nombre: string
   precio: number
+  precioBundle?: number
   canales: string[]
   incluye?: string[]
 }
@@ -286,6 +287,9 @@ export interface Cobros {
   fraccionamientoActivo?: Fraccionamiento
   resumenVRU?: ResumenVRU
   tieneDeudaO2?: boolean
+  cedidaEGC?: boolean          // RF-COB-06: deuda cedida a EGC/FGES
+  deudaIncobrable?: boolean    // RF-COB-06: deuda en bolsa incobrable
+  saldoAFavor?: number         // RF-COB-07: saldo disponible para compensación
 }
 
 export interface FacturaDeuda {

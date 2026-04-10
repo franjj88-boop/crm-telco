@@ -116,35 +116,66 @@ export function HomePage() {
         ))}
       </div>
 
-      <div className="grid2">
-        {/* Historial compacto */}
+<div className="grid2">
+        {/* RF-03 — Resumen inteligente de interacciones omnicanal */}
         <div className="card">
-          <div className="card-title">
-            Historial omnicanal
-            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-              {datos.historial.length} interacciones
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {datos.historial.slice(0, 6).map((h, i) => {
-              const repeticion = datos.historial.filter(h2 => h2.causaAgrupacion === h.causaAgrupacion && !h2.resuelto).length > 1
-              return (
-                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < datos.historial.length - 1 ? '1px solid var(--color-border-tertiary)' : 'none' }}>
-                  <span className={`status-dot ${h.resuelto ? 'status-dot-ok' : 'status-dot-err'}`} style={{ width: 6, height: 6, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.motivo}</span>
-                      {repeticion && !h.resuelto && (
-                        <span style={{ fontSize: 9, padding: '0px 4px', borderRadius: 3, background: 'var(--color-amber-mid)', color: 'var(--color-amber-dark)', fontWeight: 700, flexShrink: 0 }}>REP</span>
+          <div className="card-title">Interacciones recientes</div>
+          {(() => {
+            const historial = datos.historial || []
+
+            const porMotivo: Record<string, typeof historial> = {}
+            historial.forEach(h => {
+              const key = h.motivo || 'Sin motivo'
+              if (!porMotivo[key]) porMotivo[key] = []
+              porMotivo[key].push(h)
+            })
+
+            const patrones = Object.entries(porMotivo).filter(([, items]) => items.length >= 2)
+
+            return (
+              <>
+                {/* Patrones detectados — RF-03 CA-03-02 */}
+                {patrones.length > 0 && (
+                  <div style={{ marginBottom: 12, padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 4 }}>
+                      🔁 Patrones detectados
+                    </div>
+                    {patrones.map(([motivo, items]) => (
+                      <div key={motivo} style={{ fontSize: 11, color: 'var(--color-amber-dark)', marginBottom: 2 }}>
+                        ⚠ <strong>{items.length} contactos</strong> por "{motivo}" en los últimos {Math.ceil(items.length * 3)} días
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {historial.slice(0, 4).map((h, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '7px 0', borderBottom: i < 3 ? '1px solid var(--color-border-tertiary)' : 'none' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>
+                          {h.canal === 'telefono' ? '📞' : h.canal === 'tienda' ? '🏪' : h.canal === 'chat' ? '💬' : '📱'}
+                        </span>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>{h.motivo || 'Consulta general'}</div>
+                          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{h.fecha} · {h.canal}</div>
+                          {!h.resuelto && (
+                            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 9999, background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', fontWeight: 700 }}>
+                              Sin resolver
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {porMotivo[h.motivo || 'Sin motivo']?.length >= 2 && (
+                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-red-light)', color: 'var(--color-red-dark)', border: '1px solid var(--color-red-border)', fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
+                          {porMotivo[h.motivo || 'Sin motivo'].length}x
+                        </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{h.canal} · {h.duracion}</div>
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{h.fecha}</div>
+                  ))}
                 </div>
-              )
-            })}
-          </div>
+              </>
+            )
+          })()}
         </div>
 
         {/* Panel derecho */}
@@ -306,6 +337,39 @@ export function HomePage() {
               ))}
             </div>
           )}
+
+          {/* RF-PI-01 RN-PI-07 — NBA solo si sin alertas críticas */}
+          {(datos as any).porfolio === 'fusion' && (() => {
+            const hayAlertaCritica =
+              datos.cobros.estadoGeneral === 'vencida' ||
+              datos.averias.some(a => a.estado !== 'resuelta') ||
+              datos.pedidos.some(p => p.estado === 'en_incidencia')
+
+            if (hayAlertaCritica) return (
+              <div style={{ padding: '10px 14px', borderRadius: 'var(--border-radius-lg)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)' }}>
+                ⚠ Propuesta comercial pausada — hay alertas críticas activas que requieren atención primero
+              </div>
+            )
+            return (
+              <div className="card fade-in" style={{ border: '1.5px solid #FB923C', background: '#FFF7ED' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#C2410C', marginBottom: 4 }}>
+                      🔄 Migración disponible — tu porfolio puede mejorar
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9A3412' }}>
+                      Este cliente tiene Fusión. Puede migrar a mi Movistar y acceder a mejores condiciones.
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/cliente/${id}/venta`)}
+                    style={{ padding: '6px 14px', background: '#EA580C', color: '#fff', border: 'none', borderRadius: 'var(--border-radius-md)', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 12 }}>
+                    Gestionar →
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </>

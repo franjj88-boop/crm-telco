@@ -16,22 +16,24 @@ const timelineMock: Record<string, {
   canal?: string
 }[]> = {
   'REC-2026-0341': [
-    { estado: 'Abierta', fecha: '05/03/2026', activo: false, comunicacion: 'SMS confirmación apertura enviado al cliente', canal: 'SMS' },
-    { estado: 'En revisión CGR', fecha: '06/03/2026', activo: true, slaInfo: '4 días hábiles transcurridos — SLA: 7 días hábiles', fechaEstimada: 'Resolución estimada: 14/03/2026', canal: 'Email previsto al resolver' },
-    { estado: 'Consulta a sistemas origen', fecha: '', activo: false, fechaEstimada: 'Pendiente' },
-    { estado: 'Resolución ARTE', fecha: '', activo: false, fechaEstimada: 'Pendiente' },
-    { estado: 'Comunicación al cliente', fecha: '', activo: false, canal: 'Email + SMS', fechaEstimada: 'Pendiente' },
-    { estado: 'Gestión económica — abono', fecha: '', activo: false, fechaEstimada: 'Próxima factura estimada' },
-    { estado: 'Cierre y archivo', fecha: '', activo: false },
+    { estado: 'Abierta', fecha: '15/03/2026', activo: false, comunicacion: 'Reclamación aperturada por agente', canal: 'Telefónico' },
+    { estado: 'En CGR', fecha: '17/03/2026', activo: false, comunicacion: 'Derivada a Centro de Gestión de Reclamaciones', canal: 'Interno' },
+    { estado: 'Consulta a terceros', fecha: '19/03/2026', activo: true, fechaEstimada: 'SLA: 5 días hábiles (vence 26/03/2026)', comunicacion: 'Solicitada información a sistema de facturación', canal: 'Automático' },
+    { estado: 'Respuesta de terceros', fecha: '', activo: false, fechaEstimada: 'Pendiente respuesta' },
+    { estado: 'Resolución', fecha: '', activo: false, fechaEstimada: 'Pendiente resolución' },
+    { estado: 'Comunicación de resolución', fecha: '', activo: false },
+    { estado: 'Gestión económica — abono', fecha: '', activo: false, fechaEstimada: 'Próxima factura estimada', comunicacion: 'Abono de 22,60€ programado en próxima factura — FAC-2026-04', canal: 'Automático' },
+    { estado: 'Cierre final', fecha: '', activo: false },
   ],
   'REC-2026-0287': [
-    { estado: 'Abierta', fecha: '02/03/2026', activo: false, comunicacion: 'SMS confirmación apertura', canal: 'SMS' },
-    { estado: 'Cobro suspendido', fecha: '02/03/2026', activo: false, comunicacion: 'Bloqueo de cobro factura FAC-2026-02-0014 activado', canal: 'Automático' },
-    { estado: 'En revisión CGR', fecha: '03/03/2026', activo: true, slaInfo: '6 días hábiles transcurridos — SLA: 7 días hábiles ⚠ Próximo vencimiento', fechaEstimada: 'Resolución estimada: 11/03/2026', canal: 'Email previsto al resolver' },
-    { estado: 'Resolución ARTE', fecha: '', activo: false, fechaEstimada: 'Pendiente' },
-    { estado: 'Comunicación al cliente', fecha: '', activo: false, canal: 'Email + SMS' },
-    { estado: 'Gestión económica — abono', fecha: '', activo: false },
-    { estado: 'Cierre y archivo', fecha: '', activo: false },
+    { estado: 'Abierta', fecha: '02/02/2026', activo: false },
+    { estado: 'En CGR', fecha: '05/02/2026', activo: false },
+    { estado: 'Consulta a terceros', fecha: '08/02/2026', activo: false },
+    { estado: 'Respuesta de terceros', fecha: '12/02/2026', activo: false },
+    { estado: 'Resolución', fecha: '14/02/2026', activo: true, comunicacion: 'Reclamación resuelta parcialmente — pendiente confirmación' },
+    { estado: 'Comunicación de resolución', fecha: '', activo: false },
+    { estado: 'Gestión económica — abono', fecha: '', activo: false, fechaEstimada: 'Pendiente resolución', comunicacion: 'Abono de 44,90€ pendiente — bloqueado hasta resolución de reclamación', canal: 'Automático' },
+    { estado: 'Cierre final', fecha: '', activo: false },
   ],
 }
 
@@ -70,6 +72,7 @@ export function ReclamacionesPage() {
   const [formFactura, setFormFactura] = useState('')
   const [formComentarioAgente, setFormComentarioAgente] = useState('')
   const [mostrarComms, setMostrarComms] = useState<string | null>(null)
+  const [filtroLinea, setFiltroLinea] = useState<string>('todas')
 
   // Acciones sobre reclamación
   const [estadoReclamacion, setEstadoReclamacion] = useState<Record<string, string>>({})
@@ -244,11 +247,28 @@ export function ReclamacionesPage() {
 
 
       {nuevaAbierta && (
-        <div className="alert alert-ok fade-in">
-          <span>✓</span>
-          <div>
-            <div style={{ fontWeight: 600 }}>Reclamación abierta — REC-2026-{Math.floor(Math.random() * 900 + 100)}</div>
-            <div style={{ fontSize: 11, marginTop: 2 }}>Robot ARTE iniciado · Resolución estimada en 7 días hábiles</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} className="fade-in">
+          <div className="alert alert-ok">
+            <span>✓</span>
+            <div>
+              <div style={{ fontWeight: 600 }}>Reclamación abierta — REC-2026-{Math.floor(Math.random() * 900 + 100)}</div>
+              <div style={{ fontSize: 11, marginTop: 2 }}>Robot ARTE iniciado · Resolución estimada en 7 días hábiles</div>
+            </div>
+          </div>
+          {/* RF-RECL-005 — Resultado cocinado ARTE simulado */}
+          <div style={{ padding: '10px 14px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', fontSize: 11 }}>
+            <div style={{ fontWeight: 700, color: 'var(--color-blue-dark)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 18, height: 18, background: 'var(--color-blue)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#fff', fontWeight: 700 }}>AI</div>
+              ARTE — Resultado del análisis automático
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--color-blue-dark)' }}>
+              <div>📋 Motivo codificado: <strong>{motivoCodificado?.motivo || 'Económica — Facturación'}</strong></div>
+              <div>🔍 Diagnóstico: Variación detectada compatible con reclamación económica</div>
+              <div>💶 Propuesta ARTE: <strong>Abono estimado en próxima factura</strong></div>
+              <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4 }}>
+                Procesado: {new Date().toLocaleString('es-ES')} · Versión ARTE: v3.2.1
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -360,6 +380,33 @@ export function ReclamacionesPage() {
                   ) : null
                 })()
               )}
+
+              {/* RF-RECL-016 — Árbol de decisión para cuotas/promos */}
+              {motivoCodificado && (
+                motivoCodificado.submotivo?.toLowerCase().includes('cuota') ||
+                motivoCodificado.submotivo?.toLowerCase().includes('promo') ||
+                motivoCodificado.submotivo?.toLowerCase().includes('precio')
+              ) ? (
+                <div className="fade-in" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-secondary)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                    🔍 Árbol de decisión — Cuotas / Promociones
+                  </div>
+                  {[
+                    { pregunta: '¿Tiene algún pedido en curso que pudiera haber alterado la cuota?' },
+                    { pregunta: '¿Se produjo una alta o baja tardía en el período reclamado?' },
+                    { pregunta: '¿Existe una promoción que debería estar activa pero no se ha aplicado?' },
+                    { pregunta: '¿Hay alguna masiva activa que pudiera justificar el cargo?' },
+                  ].map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                      <input type="checkbox" style={{ marginTop: 2, accentColor: 'var(--color-blue)', cursor: 'pointer', flexShrink: 0 }} />
+                      <span>{item.pregunta}</span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4, fontStyle: 'italic' }}>
+                    Responde las preguntas relevantes para afinar la autocodificación de motivo/submotivo
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -402,11 +449,22 @@ export function ReclamacionesPage() {
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="status-dot status-dot-ok" />
-                <span style={{ fontSize: 10, color: 'var(--color-green-dark)', fontWeight: 600 }}>
-                  Medio de contacto verificado — {datos.email}
-                </span>
+              <div style={{ marginTop: 8 }}>
+                {datos.telefono ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="status-dot status-dot-ok" />
+                    <span style={{ fontSize: 10, color: 'var(--color-green-dark)', fontWeight: 600 }}>
+                      ✓ Medio validado — {datos.email} · {datos.telefono}
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="status-dot status-dot-warn" />
+                    <span style={{ fontSize: 10, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                      ⚠ Teléfono no validado — requerido para enviar comunicaciones de resolución
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -669,7 +727,23 @@ export function ReclamacionesPage() {
               </div>
             </div>
           ) : (
-            datos.reclamaciones.map(r => (
+            <>
+            {/* RF-RECL-015 — Filtro por línea */}
+            {datos.lineasMovil && datos.lineasMovil.length > 1 && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Filtrar por línea:</span>
+                {[{ id: 'todas', label: 'Todas' }, ...datos.lineasMovil.map(l => ({ id: l.numero, label: l.numero }))].map(op => (
+                  <button key={op.id}
+                    onClick={() => setFiltroLinea(op.id)}
+                    style={{ padding: '3px 10px', fontSize: 11, borderRadius: 9999, border: `1.5px solid ${filtroLinea === op.id ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: filtroLinea === op.id ? 'var(--color-blue-light)' : 'none', color: filtroLinea === op.id ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: filtroLinea === op.id ? 600 : 400 }}>
+                    {op.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {datos.reclamaciones
+              .filter(r => filtroLinea === 'todas' || (r as any).linea === filtroLinea)
+              .map(r => (
               <div
                 key={r.id}
                 onClick={() => abrirDetalle(r.id)}
@@ -718,7 +792,8 @@ export function ReclamacionesPage() {
                   </div>
                 )}
               </div>
-            ))
+            ))}
+            </>
           )}
         </div>
       )}
@@ -850,6 +925,23 @@ export function ReclamacionesPage() {
                                 <span>{t.comunicacion}</span>
                               </div>
                             )}
+                            {/* RF-15 — SLA a terceros + comunicación intermedia */}
+                            {t.fechaEstimada && !activo && !completado && (
+                              <div style={{ fontSize: 10, color: t.estado.includes('terceros') ? 'var(--color-red-dark)' : 'var(--color-text-tertiary)', marginTop: 3, fontStyle: 'italic', fontWeight: t.fechaEstimada.includes('SLA') ? 700 : 400 }}>
+                                {t.estado.includes('terceros') ? '⏱ ' : ''}{t.fechaEstimada}
+                              </div>
+                            )}
+                            {t.fechaEstimada && activo && (
+                              <div style={{ fontSize: 10, color: t.estado.includes('terceros') ? 'var(--color-red-dark)' : 'var(--color-text-tertiary)', marginTop: 3, fontStyle: 'italic', fontWeight: t.fechaEstimada.includes('SLA') ? 700 : 400 }}>
+                                {t.estado.includes('terceros') ? '⏱ ' : ''}{t.fechaEstimada}
+                              </div>
+                            )}
+                            {t.comunicacion && activo && (
+                              <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(255,255,255,0.6)', border: '1px solid var(--color-border-secondary)', fontSize: 10, color: 'var(--color-text-secondary)' }}>
+                                📬 {t.comunicacion}
+                                {t.canal && <span style={{ marginLeft: 6, color: 'var(--color-text-tertiary)' }}>· {t.canal}</span>}
+                              </div>
+                            )}
                           </div>
                           {t.fecha && (
                             <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0, marginTop: 2 }}>{t.fecha}</span>
@@ -906,18 +998,100 @@ export function ReclamacionesPage() {
             </div>
           )}
 
+          {/* RF-15 CA-04 — Cobros/abonos integrados con datos reales */}
+          {reclamacion && (() => {
+            const estadoActual = estadoReclamacion[reclamacion.id] || reclamacion.estado
+            const abonoProgramado = estadoActual === 'resuelta'
+            const importeAbono = reclamacion.importeReclamado
+            const bloqueaCobro = reclamacion.bloquea
+
+            return (
+              <div className="card">
+                <div className="card-title">
+                  💳 Cobros y abonos
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {/* Importe en disputa */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-red-light)', border: '1px solid var(--color-red-border)' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-red-dark)' }}>Importe en disputa</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-red-dark)', opacity: 0.8, marginTop: 2 }}>
+                        {bloqueaCobro ? '⛔ Cobro suspendido hasta resolución' : 'Sin bloqueo de cobro'}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-red-dark)' }}>
+                      {importeAbono.toFixed(2)}€
+                    </span>
+                  </div>
+
+                  {/* Abono programado o pendiente */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: abonoProgramado ? 'var(--color-green-light)' : 'var(--color-background-secondary)', border: `1px solid ${abonoProgramado ? 'var(--color-green-border)' : 'var(--color-border-secondary)'}` }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: abonoProgramado ? 'var(--color-green-dark)' : 'var(--color-text-secondary)' }}>
+                        {abonoProgramado ? '✓ Abono programado' : 'Abono pendiente de resolución'}
+                      </div>
+                      <div style={{ fontSize: 10, color: abonoProgramado ? 'var(--color-green-dark)' : 'var(--color-text-tertiary)', marginTop: 2 }}>
+                        {abonoProgramado ? 'Se aplicará en la próxima factura del cliente' : 'El abono se programará una vez resuelta la reclamación'}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: abonoProgramado ? 'var(--color-green-dark)' : 'var(--color-text-tertiary)' }}>
+                      {abonoProgramado ? `−${importeAbono.toFixed(2)}€` : '—'}
+                    </span>
+                  </div>
+
+                  {/* Trazabilidad si abono programado */}
+                  {abonoProgramado && (
+                    <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', fontSize: 11, color: 'var(--color-blue-dark)' }} className="fade-in">
+                      <div style={{ fontWeight: 700, marginBottom: 3 }}>📋 Trazabilidad del abono</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                        <span>Importe abono</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{importeAbono.toFixed(2)}€</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+                        <span>Factura destino</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>Próxima emisión</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+                        <span>Origen reclamación</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{reclamacion.numero}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bloqueo cobro */}
+                  {bloqueaCobro && (
+                    <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                      ⛔ RN-02-02 activa — No se puede reiterar cobro mientras esta reclamación esté abierta
+                      <button onClick={() => navigate(`/cliente/${id}/cobros`)} style={{ display: 'block', marginTop: 6, fontSize: 11, color: 'var(--color-amber-dark)', background: 'none', border: '1px solid var(--color-amber-border)', borderRadius: 'var(--border-radius-md)', padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                        Ver módulo cobros →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="grid2">
             {/* Resumen ARTE */}
             {reclamacion.resumenIA && (
               <div className="card card-blue">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <div style={{ width: 20, height: 20, background: 'var(--color-blue-light)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--color-blue-dark)', fontWeight: 700 }}>AI</div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-blue-dark)' }}>Resumen ARTE</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-blue-dark)' }}>Resumen IA — Aikos/ICOS</span>
                   <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue-light)', color: 'var(--color-blue-dark)', border: '1px solid var(--color-blue-mid)' }}>Automático</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{reclamacion.resumenIA}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 10 }}>{reclamacion.resumenIA}</div>
 
-                {/* RF-03 — Impacto económico claro */}
+                {/* RF-RECL-012 — Metadatos IA */}
+                <div style={{ padding: '6px 10px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(255,255,255,0.5)', border: '1px solid var(--color-blue-mid)', fontSize: 10, color: 'var(--color-blue-dark)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <span>📡 Fuente: Aikos v2.1</span>
+                  <span>📅 {reclamacion.fechaApertura} · {reclamacion.fechaResolucion || 'En curso'}</span>
+                  <span>🔖 Versión modelo: gpt-4o-2026-03</span>
+                  <span>✓ Trazabilidad: NPDE-RECL-FACT-001</span>
+                </div>
+
+                {/* RF-RECL-003 — Impacto económico claro */}
                 <div style={{ marginTop: 12, padding: '8px 10px', background: 'var(--color-green-light)', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-green-border)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-green-dark)', marginBottom: 3 }}>
                     ✓ Impacto económico estimado
@@ -925,6 +1099,53 @@ export function ReclamacionesPage() {
                   <div style={{ fontSize: 12, color: 'var(--color-green-dark)' }}>
                     Abono de <strong>{reclamacion.importeReclamado.toFixed(2)}€</strong> en la próxima factura (estimado)
                   </div>
+                </div>
+
+                {/* RF-RECL-017 — Transparencia de cálculos */}
+                {reclamacion.importeReclamado > 0 && (
+                  <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(255,255,255,0.6)', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-blue-mid)', fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>📊 Detalle de cálculo de devolución</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Importe reclamado</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{reclamacion.importeReclamado.toFixed(2)}€</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Forma de devolución</span>
+                        <span style={{ fontWeight: 600 }}>Abono en próxima factura</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Plazo estimado</span>
+                        <span style={{ fontWeight: 600 }}>~10 días hábiles</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Factura destino del abono</span>
+                        <span style={{ fontWeight: 600 }}>Próxima emisión</span>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 10, opacity: 0.75, fontStyle: 'italic' }}>
+                      Cálculo basado en período {reclamacion.fechaApertura} · Sujeto a validación CGR
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RF-RECL-012: Resumen IA genérico si no tiene resumenIA específico */}
+            {!reclamacion.resumenIA && (
+              <div className="card card-blue">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <div style={{ width: 20, height: 20, background: 'var(--color-blue-light)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--color-blue-dark)', fontWeight: 700 }}>AI</div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-blue-dark)' }}>Resumen IA — Aikos/ICOS</span>
+                  <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)' }}>Pendiente generación</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+                  Reclamación {reclamacion.numero} — {reclamacion.motivo}. Importe reclamado: {reclamacion.importeReclamado.toFixed(2)}€. Estado actual: {reclamacion.estado}. Apertura el {reclamacion.fechaApertura} por canal {reclamacion.canal}.
+                </div>
+                <div style={{ padding: '6px 10px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(255,255,255,0.5)', border: '1px solid var(--color-blue-mid)', fontSize: 10, color: 'var(--color-blue-dark)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <span>📡 Fuente: Aikos v2.1</span>
+                  <span>📅 Generado: {new Date().toLocaleDateString('es-ES')}</span>
+                  <span>🔖 Versión modelo: gpt-4o-2026-03</span>
                 </div>
               </div>
             )}

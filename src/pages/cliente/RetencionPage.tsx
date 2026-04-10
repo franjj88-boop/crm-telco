@@ -67,6 +67,9 @@ export function RetencionPage() {
   const [mlpEmail, setMlpEmail] = useState('')
   const [mlpEnviado, setMlpEnviado] = useState(false)
   const [mostrarMLP, setMostrarMLP] = useState(false)
+  const [accionesPorProducto, setAccionesPorProducto] = useState<Record<string, 'mantener' | 'migrar' | 'baja'>>({})
+  const [borradores, setBorradores] = useState<{id: string; titulo: string; detalle: string; fecha: string}[]>([])
+  const [mostrarBorradores, setMostrarBorradores] = useState(false)
 
   if (!clienteActivo) return null
 
@@ -326,13 +329,51 @@ export function RetencionPage() {
                     </button>
                   </div>
 
-                  {/* MLP */}
+                  {/* RFMLP-1/2/3 */}
                   {ofertaSel && (
-                    <div style={{ marginTop: 10 }}>
-                      <button onClick={() => { setMlpEmail(clienteActivo.email || ''); setMostrarMLP(true) }}
-                        style={{ width: '100%', padding: '10px', border: `1.5px solid ${BLUE_BORDER}`, borderRadius: 8, background: BLUE_LIGHT, color: BLUE, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                        📄 Me lo pienso (MLP) — Enviar propuesta al cliente
+                    <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          const nuevo = {
+                            id: `mlp-${Date.now()}`,
+                            titulo: ofertaSel.titulo,
+                            detalle: ofertaSel.detalle,
+                            fecha: new Date().toLocaleString('es-ES')
+                          }
+                          setBorradores(prev => [...prev, nuevo])
+                          setMostrarBorradores(true)
+                        }}
+                        style={{ flex: 1, padding: '10px', border: `1.5px solid #E5E7EB`, borderRadius: 8, background: 'white', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        🖨 Imprimir borrador
                       </button>
+                      <button
+                        onClick={() => { setMlpEmail(clienteActivo.email || ''); setMostrarMLP(true) }}
+                        style={{ flex: 1, padding: '10px', border: `1.5px solid ${BLUE_BORDER}`, borderRadius: 8, background: BLUE_LIGHT, color: BLUE, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        📧 Enviar MLP
+                      </button>
+                    </div>
+                  )}
+
+                  {/* RFMLP-2 — Historial de borradores */}
+                  {mostrarBorradores && borradores.length > 0 && (
+                    <div className="fade-in" style={{ marginTop: 10, padding: '12px 16px', border: `1px solid ${BLUE_BORDER}`, borderRadius: 10, background: BLUE_LIGHT }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: BLUE, marginBottom: 10 }}>
+                        🖨 Borradores guardados ({borradores.length})
+                        <span style={{ fontSize: 10, fontWeight: 400, color: '#6B7280', marginLeft: 8 }}>Selecciona uno para envío definitivo</span>
+                      </div>
+                      {borradores.map(b => (
+                        <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', marginBottom: 6, background: 'white', borderRadius: 8, border: '1px solid #E0E7FF' }}>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{b.titulo}</div>
+                            <div style={{ fontSize: 11, color: '#6B7280' }}>{b.detalle} · {b.fecha}</div>
+                          </div>
+                          <button
+                            onClick={() => { setMlpEmail(clienteActivo.email || ''); setMostrarMLP(true) }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: BLUE, color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                            Enviar →
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -352,26 +393,45 @@ export function RetencionPage() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                   {clienteActivo.productos.map(p => {
-                    const sel = productosBaja.has(p.id)
+                    const accionActual = accionesPorProducto[p.id] || 'mantener'
                     return (
-                      <div key={p.id} onClick={() => toggleProductoBaja(p.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', border: `2px solid ${sel ? '#FECACA' : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: sel ? '#FEF2F2' : 'white', transition: 'all 0.1s' }}>
-                        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? '#EF4444' : '#D1D5DB'}`, background: sel ? '#EF4444' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          {sel && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✕</span>}
+                      <div key={p.id}
+                        style={{ padding: '12px 16px', border: `2px solid ${accionActual === 'baja' ? '#FECACA' : accionActual === 'migrar' ? '#FCD34D' : '#E5E7EB'}`, borderRadius: 10, background: accionActual === 'baja' ? '#FEF2F2' : accionActual === 'migrar' ? '#FFFBEB' : 'white', transition: 'all 0.1s' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 20 }}>{p.tipo === 'fibra' ? '📡' : p.tipo === 'tv' ? '📺' : p.tipo === 'movil' ? '📱' : '☎️'}</span>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{p.nombre}</div>
+                              {p.direccion && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{p.direccion}</div>}
+                              {p.precio !== undefined && p.precio > 0 && (
+                                <div style={{ fontSize: 11, color: '#6B7280' }}>{p.precio.toFixed(2)}€/mes</div>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {([
+                              { id: 'mantener', label: '✓ Mantener', bg: '#F0FDF4', border: '#86EFAC', color: '#166534' },
+                              { id: 'migrar', label: '→ O2', bg: '#FFFBEB', border: '#FCD34D', color: '#92400E' },
+                              { id: 'baja', label: '✕ Baja', bg: '#FEF2F2', border: '#FECACA', color: '#991B1B' },
+                            ] as const).map(op => (
+                              <button key={op.id}
+                                onClick={() => {
+                                  const s = { ...accionesPorProducto, [p.id]: op.id }
+                                  setAccionesPorProducto(s)
+                                  const baja = new Set(Object.entries(s).filter(([, v]) => v === 'baja').map(([k]) => k))
+                                  setProductosBaja(baja)
+                                }}
+                                style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: `1.5px solid ${accionActual === op.id ? op.border : '#E5E7EB'}`, background: accionActual === op.id ? op.bg : 'white', color: accionActual === op.id ? op.color : '#9CA3AF', cursor: 'pointer', transition: 'all 0.1s' }}>
+                                {op.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <span style={{ fontSize: 16, flexShrink: 0 }}>{p.tipo === 'fibra' ? '📡' : p.tipo === 'tv' ? '📺' : p.tipo === 'movil' ? '📱' : '☎️'}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: sel ? '#991B1B' : '#111827', textDecoration: sel ? 'line-through' : 'none' }}>{p.nombre}</div>
-                          {p.direccion && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{p.direccion}</div>}
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          {p.precio !== undefined && p.precio > 0 && (
-                            <div style={{ fontSize: 13, fontWeight: 700, color: sel ? '#EF4444' : '#111827' }}>{p.precio.toFixed(2)}€</div>
-                          )}
-                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: p.estado === 'activa' ? '#DCFCE7' : '#FEE2E2', color: p.estado === 'activa' ? '#166534' : '#991B1B', fontWeight: 600 }}>
-                            {p.estado}
-                          </span>
-                        </div>
+                        {accionActual === 'migrar' && (
+                          <div className="fade-in" style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#FFFBEB', border: '1px solid #FCD34D', fontSize: 11, color: '#92400E' }}>
+                            → Migración a O2 vía Paradigma. El agente iniciará el flujo de portabilidad a la finalización.
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -541,6 +601,12 @@ export function RetencionPage() {
                       </>
                     )}
                     {esBajaTotal && <div>⚠ Baja total — el cliente perderá todos sus servicios.</div>}
+                    {Object.values(accionesPorProducto).includes('migrar') && (
+                      <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 6, background: '#FFFBEB', border: '1px solid #FCD34D', fontSize: 12, color: '#92400E' }}>
+                        → {Object.entries(accionesPorProducto).filter(([, v]) => v === 'migrar').length} producto/s se migran a O2 vía Paradigma.
+                        Estado de tramitación: <strong>Pendiente de confirmación OTP</strong>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -626,6 +692,37 @@ export function RetencionPage() {
               </div>
             )}
 
+            {/* RFRET-MOT-5 — Señales operativas y eventos recientes */}
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>📡 Señales operativas</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {clienteActivo.historial.filter(h => h.motivo?.toLowerCase().includes('baja')).length > 0 && (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 11, color: '#991B1B' }}>
+                    ⚠ {clienteActivo.historial.filter(h => h.motivo?.toLowerCase().includes('baja')).length} intento/s de baja anterior/es registrados
+                  </div>
+                )}
+                {clienteActivo.productos.some((p: any) => p.finPromo) && (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FCD34D', fontSize: 11, color: '#92400E' }}>
+                    ⏰ Fin de promo próximo en {(clienteActivo.productos as any[]).find(p => p.finPromo)?.nombre}
+                  </div>
+                )}
+                {clienteActivo.averias?.filter(a => a.estado !== 'resuelta').length > 0 && (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 11, color: '#991B1B', fontWeight: 600 }}>
+                    🔧 {clienteActivo.averias.filter(a => a.estado !== 'resuelta').length} avería/s abierta/s — palanca de retención disponible
+                  </div>
+                )}
+                <div style={{ padding: '6px 10px', borderRadius: 8, background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, fontSize: 11, color: BLUE }}>
+                  👤 Cliente desde {(clienteActivo as any).fechaAlta || '2019'} · {clienteActivo.productos.length} producto/s activos
+                </div>
+                {clienteActivo.historial.filter(h => h.motivo?.toLowerCase().includes('baja')).length === 0 &&
+                 !clienteActivo.averias?.some(a => a.estado !== 'resuelta') && (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: 11, color: '#166534' }}>
+                    ✓ Sin señales operativas negativas recientes
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Indicadores */}
             <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Indicadores</div>
@@ -673,14 +770,24 @@ export function RetencionPage() {
                 ✓ Propuesta enviada · Válida 48h · El cliente recibirá el resumen en {mlpEmail}
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => { setMlpEnviado(true); setTimeout(() => { setMostrarMLP(false); setMlpEnviado(false) }, 2500) }}
-                  disabled={!mlpEmail.trim()}
-                  style={{ flex: 1, padding: '12px', background: mlpEmail.trim() ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: mlpEmail.trim() ? 'pointer' : 'not-allowed' }}>
-                  📧 Enviar por email
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setMlpEnviado(true); setTimeout(() => { setMostrarMLP(false); setMlpEnviado(false) }, 2500) }}
+                    disabled={!mlpEmail.trim()}
+                    style={{ flex: 1, padding: '12px', background: mlpEmail.trim() ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: mlpEmail.trim() ? 'pointer' : 'not-allowed' }}>
+                    📧 Enviar por email
+                  </button>
+                  <button disabled
+                    style={{ padding: '12px 16px', background: '#F3F4F6', color: '#9CA3AF', border: '1.5px solid #E5E7EB', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'not-allowed' }}
+                    title="WhatsApp — disponible próximamente">
+                    💬 WhatsApp
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: '#9CA3AF', textAlign: 'center' }}>
+                  WhatsApp disponible próximamente · Arquitectura multicanal preparada (RFMLP-5)
+                </div>
                 <button onClick={() => setMostrarMLP(false)}
-                  style={{ padding: '12px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                  style={{ padding: '10px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
                   Cancelar
                 </button>
               </div>

@@ -103,38 +103,18 @@ export const catalogoBundles: Bundle[] = [
   {
     id: 'mov2-mix', nombre: '2 Líneas Móviles Ilimitado + 30GB',
     descripcion: 'Línea ilimitada + segunda línea de 30GB sin fibra',
-    categoria: 'movil_2l', precio: 32.90, disponible: true,
+    categoria: 'movil_2l', precio: 32.90, disponible: false,
     ingredientes: { lineas: [{ datos: 'ilimitado', tipo: 'principal' }, { datos: 30, tipo: 'adicional' }] }
   },
 ]
 
 // ── ADD-ONS DE TV ──
 export const catalogoAddonsTV: AddonTV[] = [
-  {
-    id: 'tv-ficcion', nombre: 'TV Ficción', precio: 5,
-    canales: ['HBO Max', 'AMC', 'TNT', 'AXN'],
-    incluye: ['Series internacionales', 'Cine en estreno']
-  },
-  {
-    id: 'tv-futbol', nombre: 'TV Fútbol', precio: 15,
-    canales: ['LaLiga TV', 'Movistar Liga de Campeones', 'Movistar Deportes'],
-    incluye: ['LaLiga', 'Champions League', 'Copa del Rey']
-  },
-  {
-    id: 'tv-total', nombre: 'TV Total', precio: 22,
-    canales: ['LaLiga TV', 'Champions', 'HBO Max', 'AMC', 'TNT', 'AXN', 'Movistar Deportes'],
-    incluye: ['Ficción + Fútbol + Series']
-  },
-  {
-    id: 'tv-netflix', nombre: 'Netflix incluido', precio: 8,
-    canales: ['Netflix'],
-    incluye: ['Plan Estándar Netflix']
-  },
-  {
-    id: 'tv-disney', nombre: 'Disney+ incluido', precio: 5,
-    canales: ['Disney+'],
-    incluye: ['Plan Estándar Disney+']
-  },
+  { id: 'futbol', nombre: 'Fútbol (LaLiga + Champions)', precio: 18, precioBundle: 14, canales: ['LaLiga', 'Champions League', 'Copa del Rey'] },
+  { id: 'ficcion', nombre: 'Ficción (HBO + Movistar)', precio: 12, precioBundle: 9, canales: ['HBO Max', 'Movistar Series', 'Paramount+'] },
+  { id: 'deportes', nombre: 'Deportes Plus', precio: 10, precioBundle: 8, canales: ['Eurosport', 'DAZN F1', 'NBA League Pass'] },
+  { id: 'netflix', nombre: 'Netflix Premium', precio: 18, precioBundle: 15, canales: ['Netflix 4K', '4 pantallas simultáneas'] },
+  { id: 'disney', nombre: 'Disney+', precio: 9, precioBundle: 7, canales: ['Disney+', 'Star+', 'ESPN'] },
 ]
 
 // ── LÍNEAS ADICIONALES ──
@@ -473,6 +453,7 @@ export const datosCliente: Record<string, Cliente> = {
     ],
     cobros: {
       deudaTotal: 0, estadoGeneral: 'sin_deuda', riesgo: 'bajo',
+      cedidaEGC: false, deudaIncobrable: false, saldoAFavor: 15.20,
       facturasConDeuda: []
     },
     historial: [
@@ -648,6 +629,9 @@ export const datosCliente: Record<string, Cliente> = {
       estadoGeneral: 'vencida',
       riesgo: 'alto',
       tieneDeudaO2: true,
+      cedidaEGC: true,
+      deudaIncobrable: false,
+      saldoAFavor: 0,
       facturasConDeuda: [
         {
           facturaId: 'f1', numero: 'FAC-2026-03-0021', periodo: 'Marzo 2026',
@@ -847,6 +831,7 @@ export const datosCliente: Record<string, Cliente> = {
     ],
     cobros: {
       deudaTotal: 0, estadoGeneral: 'sin_deuda', riesgo: 'bajo',
+      cedidaEGC: false, deudaIncobrable: false, saldoAFavor: 0,
       facturasConDeuda: []
     },
     historial: [
@@ -1093,3 +1078,78 @@ export const clientesLista: { id: string; nombre: string; dni: string; telefono:
   { id: 'CRM-002', nombre: 'Carlos Ruiz Martín', dni: '87654321B', telefono: '+34 654 892 001', direccion: 'Avda. Castellana, 120 5ºA', lineas: ['654 892 001'], satisfaccionRiesgo: 'critico' },
   { id: 'CRM-003', nombre: 'Empresa Técnica SL', dni: 'B12345678', telefono: '+34 912 345 678', direccion: 'C/ Serrano, 45 2ºD', lineas: ['600 001 001', '600 001 002', '600 001 003'], satisfaccionRiesgo: 'ok' },
 ]
+
+// ── FOCOS COMERCIALES ──
+export interface FocoComercial {
+  id: string
+  titulo: string
+  descripcion: string
+  icono: string
+  canal: string[]
+  badge: string
+  color: string
+  activo: boolean
+}
+
+export const focosComerciales: FocoComercial[] = [
+  {
+    id: 'fttr',
+    titulo: 'FTTR — Fibra hasta la habitación',
+    descripcion: 'Extiende la fibra óptica a cada habitación. Perfil ideal: familias, teletrabajo, gamers.',
+    icono: '🔧',
+    canal: ['telefono', 'tienda'],
+    badge: 'MES',
+    color: '#7C3AED',
+    activo: true,
+  },
+  {
+    id: 'tv-futbol',
+    titulo: 'TV Fútbol — Liga y Champions',
+    descripcion: 'Acceso a LaLiga TV y UEFA Champions League. Ahora con descuento al contratar bundle convergente.',
+    icono: '⚽',
+    canal: ['telefono', 'tienda', 'chat'],
+    badge: 'PROMO',
+    color: '#059669',
+    activo: true,
+  },
+  {
+    id: 'dispositivos',
+    titulo: 'Dispositivos — Financiación sin intereses',
+    descripcion: 'Smartphones y tablets con financiación a 24 meses sin intereses. Última campaña Blue.',
+    icono: '📱',
+    canal: ['tienda', 'telefono'],
+    badge: 'BLUE',
+    color: '#0033A0',
+    activo: true,
+  },
+]
+
+// ── ARGUMENTARIO NBA ──
+export const argumentarioNBA: Record<string, { beneficios: string[]; comparativa: string; ahorroPrecio?: number }> = {
+  'cv1-600-inf': {
+    beneficios: [
+      'Fibra 600 Mb simétrica — sin compartir',
+      'Línea móvil ilimitada sin cortes',
+      'Sin permanencia al renovar antes del vencimiento',
+    ],
+    comparativa: 'El cliente paga actualmente tarifas equivalentes en el mercado a 79€/mes. Con esta oferta accede a 64,90€.',
+  },
+  'cv1-1g-inf': {
+    beneficios: [
+      'Fibra 1 Gb — la mayor velocidad del catálogo',
+      'Línea móvil ilimitada incluida',
+      'Soporte técnico prioritario 24/7',
+    ],
+    comparativa: 'Competidores ofrecen 1 Gb + ilimitado por 89€/mes de media. Aquí: 74,90€.',
+    ahorroPrecio: 15,
+  },
+  'cv2-600-inf-inf': {
+    beneficios: [
+      'Fibra 600 Mb + 2 líneas ilimitadas',
+      'Ideal para parejas o familias pequeñas',
+      'Segunda línea a precio de adicional',
+    ],
+    comparativa: 'Para 2 líneas ilimitadas en otros operadores: desde 99€. Aquí: 84,90€.',
+    ahorroPrecio: 12,
+  },
+}

@@ -290,6 +290,27 @@ export function ConsumosPage() {
                           ) : (
                             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>No facturado</div>
                           )}
+                          {/* RF-17 — Apertura reclamación desde consumo con precarga */}
+                          {(c.descripcion.toLowerCase().includes('roaming') ||
+                            c.descripcion.toLowerCase().includes('900') ||
+                            c.descripcion.toLowerCase().includes('800') ||
+                            c.importe > 5) && (
+                            <button
+                              onClick={e => { e.stopPropagation(); navigate(`/cliente/${id}/reclamaciones`, {
+                                state: {
+                                  abrirFormulario: true,
+                                  facturaId: c.facturaId,
+                                  importe: c.importe,
+                                  motivo: `Reclamación consumo: ${c.descripcion}`,
+                                  tipoPredef: c.descripcion.toLowerCase().includes('roaming') ? 'roaming' :
+                                              c.descripcion.toLowerCase().includes('900') || c.descripcion.toLowerCase().includes('800') ? '900/800' : 'consumo',
+                                  desdeConsumo: true,
+                                }
+                              })}}
+                              style={{ fontSize: 9, padding: '2px 6px', borderRadius: 'var(--border-radius-full)', border: '1px solid var(--color-red-border)', background: 'var(--color-red-light)', color: 'var(--color-red-dark)', cursor: 'pointer', fontWeight: 600, marginTop: 4, display: 'block' }}>
+                              Reclamar →
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
