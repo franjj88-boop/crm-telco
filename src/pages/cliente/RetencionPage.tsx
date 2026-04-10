@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { catalogoBundles, catalogoAddonsTV, buscarBundles } from '../../data/mockData'
-import type { Bundle, ResultadoBusquedaBundle, Producto } from '../../types'
+import type { Bundle, ResultadoBusquedaBundle } from '../../types'
 
 type Paso = 'retencion' | 'seleccion_baja' | 'reposicion' | 'firma'
 
@@ -27,14 +27,14 @@ const motivosBaja = [
 ]
 
 const motivosEstandarizados = [
-  { id: 'precio',      label: 'Precio elevado',            keywords: ['precio', 'caro', 'econom', 'dinero'] },
-  { id: 'competencia', label: 'Oferta de competencia',     keywords: ['cambio', 'operador', 'competen', 'otra'] },
-  { id: 'no_uso',      label: 'No usa los servicios',      keywords: ['no uso', 'no necesito', 'poco uso'] },
-  { id: 'tecnico',     label: 'Problema técnico',          keywords: ['técnico', 'avería', 'internet', 'caída', 'lento'] },
-  { id: 'atencion',    label: 'Mala atención',             keywords: ['atención', 'servicio', 'mal trato'] },
-  { id: 'traslado',    label: 'Traslado / Mudanza',        keywords: ['mudanza', 'traslado', 'extranjero', 'me voy'] },
-  { id: 'economico',   label: 'Dificultad económica',      keywords: ['económic', 'problema económ', 'paro'] },
-  { id: 'otro',        label: 'Otro motivo',               keywords: [] },
+  { id: 'precio',      label: 'Precio elevado',        keywords: ['precio', 'caro', 'econom', 'dinero'] },
+  { id: 'competencia', label: 'Oferta competencia',    keywords: ['cambio', 'operador', 'competen', 'otra'] },
+  { id: 'no_uso',      label: 'No usa servicios',      keywords: ['no uso', 'no necesito', 'poco uso'] },
+  { id: 'tecnico',     label: 'Problema técnico',      keywords: ['técnico', 'avería', 'internet', 'caída', 'lento'] },
+  { id: 'atencion',    label: 'Mala atención',         keywords: ['atención', 'servicio', 'mal trato'] },
+  { id: 'traslado',    label: 'Traslado / Mudanza',    keywords: ['mudanza', 'traslado', 'extranjero', 'me voy'] },
+  { id: 'economico',   label: 'Dificultad económica',  keywords: ['económic', 'problema económ', 'paro'] },
+  { id: 'otro',        label: 'Otro motivo',           keywords: [] },
 ]
 
 const argumentario: Record<string, string> = {
@@ -45,6 +45,10 @@ const argumentario: Record<string, string> = {
   'Mal servicio al cliente': '"Entendemos tu frustración y queremos mejorar tu experiencia. ¿Puedo compensarte por las molestias?"',
   'Problemas económicos': '"Podemos estudiar un fraccionamiento o una tarifa más económica que se adapte mejor a tu situación."',
 }
+
+const BLUE = '#0033A0'
+const BLUE_LIGHT = '#EEF2FF'
+const BLUE_BORDER = '#C7D2FE'
 
 export function RetencionPage() {
   const { clienteActivo } = useAppStore()
@@ -60,52 +64,45 @@ export function RetencionPage() {
   const [procesando, setProcesando] = useState(false)
   const [resultado, setResultado] = useState<'retenido' | 'baja' | null>(null)
   const [firmando, setFirmando] = useState(false)
+  const [mlpEmail, setMlpEmail] = useState('')
+  const [mlpEnviado, setMlpEnviado] = useState(false)
+  const [mostrarMLP, setMostrarMLP] = useState(false)
 
   if (!clienteActivo) return null
 
   const toggleMotivo = (m: string) => {
     const s = new Set(motivosSel)
-    if (s.has(m)) s.delete(m); else s.add(m)
+    s.has(m) ? s.delete(m) : s.add(m)
     setMotivosSel(s)
   }
 
   const toggleProductoBaja = (pid: string) => {
     const s = new Set(productosBaja)
-    if (s.has(pid)) s.delete(pid); else s.add(pid)
+    s.has(pid) ? s.delete(pid) : s.add(pid)
     setProductosBaja(s)
   }
 
   const toggleAddonTV = (id: string) => {
     const s = new Set(addonsTVSel)
-    if (s.has(id)) s.delete(id); else s.add(id)
+    s.has(id) ? s.delete(id) : s.add(id)
     setAddonsTVSel(s)
   }
 
-  // Calcular qué queda tras la baja y qué bundle ofrecer
   const calcularParqueTrasBaja = () => {
-    const productosQueQuedan = clienteActivo.productos.filter(p => !productosBaja.has(p.id))
-    const tieneFibra = productosQueQuedan.some(p => p.tipo === 'fibra')
-    const lineasMovil = productosQueQuedan.filter(p => p.tipo === 'movil')
-    const numLineas = lineasMovil.length
-
-    // Determinar qué bundle buscar según lo que queda
-    if (!tieneFibra && numLineas === 0) return { tipo: 'baja_total', fibra: null, lineas: 0 }
-    if (!tieneFibra && numLineas > 0) return { tipo: 'solo_movil', fibra: null, lineas: numLineas }
-    if (tieneFibra && numLineas === 0) return { tipo: 'solo_fibra', fibra: 600, lineas: 0 }
-    return { tipo: 'convergente', fibra: 600, lineas: numLineas }
+    const quedan = clienteActivo.productos.filter(p => !productosBaja.has(p.id))
+    const tieneFibra = quedan.some(p => p.tipo === 'fibra')
+    const lineas = quedan.filter(p => p.tipo === 'movil').length
+    if (!tieneFibra && lineas === 0) return { tipo: 'baja_total', fibra: null, lineas: 0 }
+    if (!tieneFibra && lineas > 0) return { tipo: 'solo_movil', fibra: null, lineas }
+    if (tieneFibra && lineas === 0) return { tipo: 'solo_fibra', fibra: 600, lineas: 0 }
+    return { tipo: 'convergente', fibra: 600, lineas }
   }
 
   const buscarReposicion = () => {
     const parque = calcularParqueTrasBaja()
-    if (parque.tipo === 'baja_total') {
-      setResultados([])
-      setBuscado(true)
-      return
-    }
+    if (parque.tipo === 'baja_total') { setResultados([]); setBuscado(true); return }
     const res = buscarBundles(parque.fibra, parque.lineas, 'ilimitado')
-    setResultados(res)
-    setBuscado(true)
-    setBundleSel(null)
+    setResultados(res); setBuscado(true); setBundleSel(null)
   }
 
   const aceptarOferta = () => {
@@ -126,11 +123,8 @@ export function RetencionPage() {
   const parqueTrasCalc = calcularParqueTrasBaja()
   const esBajaTotal = parqueTrasCalc.tipo === 'baja_total'
 
-  // Generar ofertas de retención según motivos
   const generarOfertas = (): OfertaRetencion[] => {
     const ofertas: OfertaRetencion[] = []
-
-    // Ofertas de descuento
     ofertas.push({
       id: 'desc-20', tipo: 'descuento', titulo: 'Descuento 20%',
       descripcion: 'Descuento del 20% sobre tu tarifa actual durante 6 meses',
@@ -143,8 +137,6 @@ export function RetencionPage() {
       detalle: `${(totalParque * 0.7 * 1.21).toFixed(2)}€/mes durante 3 meses`,
       valor: 30, duracionMeses: 3
     })
-
-    // Ofertas de mejora de servicio
     const bundleActualObj = catalogoBundles.find(b => b.id === clienteActivo.bundleActual)
     if (bundleActualObj?.ingredientes.fibra && bundleActualObj.ingredientes.fibra < 1000) {
       ofertas.push({
@@ -160,65 +152,75 @@ export function RetencionPage() {
         detalle: `Datos ilimitados por ${(totalParque * 1.21).toFixed(2)}€/mes — mismo precio`
       })
     }
-
     return ofertas
   }
 
   const ofertas = generarOfertas()
 
-  const matchColor = (tipo: string) => {
-    if (tipo === 'exacto') return { bg: 'var(--color-green-light)', border: 'var(--color-green-border)', color: 'var(--color-green-dark)', label: '✓ Exacto' }
-    if (tipo === 'aproximado') return { bg: 'var(--color-blue-light)', border: 'var(--color-blue-mid)', color: 'var(--color-blue-dark)', label: '≈ Aproximado' }
-    return { bg: 'var(--color-amber-light)', border: 'var(--color-amber-border)', color: 'var(--color-amber-dark)', label: '~ Parcial' }
-  }
+  const matchColor = (tipo: string) => ({
+    exacto:    { bg: '#F0FDF4', border: '#86EFAC', color: '#166534', label: '✓ Match exacto' },
+    aproximado: { bg: BLUE_LIGHT, border: BLUE_BORDER, color: BLUE, label: '≈ Aproximado' },
+    parcial:   { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', label: '~ Parcial' },
+  }[tipo] || { bg: '', border: '', color: '', label: '' })
 
-  const StepTab = ({ id, label, num, active, done }: { id: Paso; label: string; num: number; active: boolean; done: boolean }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      {num > 1 && <div style={{ width: 20, height: 1, background: done ? 'var(--color-green-border)' : 'var(--color-border-secondary)' }} />}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 'var(--border-radius-full)', background: active ? 'var(--color-blue-light)' : 'transparent', border: `1px solid ${active ? 'var(--color-blue-mid)' : 'transparent'}`, cursor: !resultado ? 'pointer' : 'default' }}
-        onClick={() => !resultado && setPaso(id)}>
-        <div style={{ width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: done ? 'var(--color-green-border)' : active ? 'var(--color-blue)' : 'var(--color-background-secondary)', color: done || active ? '#fff' : 'var(--color-text-tertiary)', border: !done && !active ? '1px solid var(--color-border-secondary)' : 'none' }}>
-          {done ? '✓' : num}
-        </div>
-        <span style={{ fontSize: 11, fontWeight: active ? 600 : 400, color: active ? 'var(--color-blue-dark)' : done ? 'var(--color-green)' : 'var(--color-text-tertiary)' }}>{label}</span>
-      </div>
-    </div>
-  )
+  const pasos: { id: Paso; label: string; num: number }[] = [
+    { id: 'retencion', label: 'Retención', num: 1 },
+    { id: 'seleccion_baja', label: 'Selección baja', num: 2 },
+    { id: 'reposicion', label: 'Reposición', num: 3 },
+    { id: 'firma', label: 'Firma', num: 4 },
+  ]
+
+  const pasoIdx = pasos.findIndex(p => p.id === paso)
 
   return (
-    <>
-      {/* Header */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Header con stepper */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Retención / Gestión de baja</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-            Retención · Selección de baja · Reposicionamiento · Firma
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>Retención / Gestión de baja</div>
+          <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+            {clienteActivo.nombre} {clienteActivo.apellidos} · {clienteActivo.bundleActual}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-          <StepTab id="retencion" label="Retención" num={1} active={paso === 'retencion'} done={paso !== 'retencion' && (!!ofertaSel || motivosSel.size > 0)} />
-          <StepTab id="seleccion_baja" label="Selección baja" num={2} active={paso === 'seleccion_baja'} done={paso === 'reposicion' || paso === 'firma'} />
-          <StepTab id="reposicion" label="Reposición" num={3} active={paso === 'reposicion'} done={paso === 'firma'} />
-          <StepTab id="firma" label="Firma" num={4} active={paso === 'firma'} done={!!resultado} />
+
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {pasos.map((p, i) => {
+            const activo = p.id === paso
+            const completado = pasoIdx > i
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center' }}>
+                {i > 0 && <div style={{ width: 24, height: 2, background: completado ? BLUE : '#E5E7EB' }} />}
+                <div
+                  onClick={() => !resultado && setPaso(p.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: activo ? BLUE_LIGHT : 'transparent', cursor: !resultado ? 'pointer' : 'default' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: completado ? BLUE : activo ? BLUE : '#F3F4F6', color: (completado || activo) ? 'white' : '#9CA3AF', border: (!completado && !activo) ? '1.5px solid #D1D5DB' : 'none' }}>
+                    {completado ? '✓' : p.num}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: activo ? 600 : 400, color: activo ? BLUE : completado ? BLUE : '#9CA3AF', whiteSpace: 'nowrap' }}>{p.label}</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
       {/* Resultado final */}
       {resultado && (
-        <div className={`alert ${resultado === 'retenido' ? 'alert-ok' : 'alert-err'} fade-in`} style={{ padding: '14px 16px' }}>
-          <span style={{ fontSize: 20 }}>{resultado === 'retenido' ? '🎉' : '✓'}</span>
+        <div style={{ padding: '20px 24px', background: resultado === 'retenido' ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${resultado === 'retenido' ? '#86EFAC' : '#FECACA'}`, borderRadius: 12, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <span style={{ fontSize: 28, flexShrink: 0 }}>{resultado === 'retenido' ? '🎉' : '✓'}</span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: resultado === 'retenido' ? '#166534' : '#991B1B', marginBottom: 4 }}>
               {resultado === 'retenido' ? 'Cliente retenido — oferta aceptada y confirmada' : 'Baja tramitada — confirmación enviada al cliente'}
             </div>
-            <div style={{ fontSize: 11, marginTop: 3, opacity: 0.85 }}>
+            <div style={{ fontSize: 13, color: resultado === 'retenido' ? '#166534' : '#991B1B', opacity: 0.85 }}>
               {resultado === 'retenido'
                 ? ofertaSel?.tipo === 'descuento'
                   ? `Descuento del ${ofertaSel.valor}% aplicado durante ${ofertaSel.duracionMeses} meses`
                   : `Mejora aplicada: ${ofertaSel?.titulo}`
                 : esBajaTotal
                   ? 'Baja total tramitada correctamente'
-                  : `Baja parcial tramitada · Nueva tarifa: ${bundleSel?.nombre || 'sin reposición'}`
+                  : `Baja parcial · Nueva tarifa: ${bundleSel?.nombre || 'sin reposición'}`
               }
             </div>
           </div>
@@ -226,48 +228,40 @@ export function RetencionPage() {
       )}
 
       {!resultado && (
-        <div className="grid2">
-          {/* Panel izquierdo — flujo */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
+
+          {/* Panel izquierdo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* ── PASO 1: RETENCIÓN ── */}
             {paso === 'retencion' && (
               <>
-                {/* Motivos — RF-09 */}
-                <div className="card">
-                  <div className="card-title">
-                    1. Motivo de contacto
-                    {motivosSel.size > 0 && (
-                      <span className="badge badge-blue">{motivosSel.size} seleccionado/s</span>
-                    )}
+                {/* Motivos */}
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 4 }}>
+                    Motivo de la baja
+                    {motivosSel.size > 0 && <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 10, background: BLUE_LIGHT, color: BLUE, fontWeight: 600 }}>{motivosSel.size} seleccionado/s</span>}
                   </div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 14 }}>Selecciona el motivo o motivos declarados por el cliente</div>
 
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
-                    Selecciona el motivo o motivos declarados por el cliente
-                  </div>
-
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: motivosSel.size > 0 ? 12 : 0 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: motivosSel.size > 0 ? 16 : 0 }}>
                     {motivosBaja.map(m => (
                       <button key={m} onClick={() => toggleMotivo(m)}
-                        style={{ padding: '5px 12px', fontSize: 11, borderRadius: 'var(--border-radius-full)', border: `1.5px solid ${motivosSel.has(m) ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: motivosSel.has(m) ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', color: motivosSel.has(m) ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: motivosSel.has(m) ? 600 : 400, transition: 'all 0.1s' }}>
+                        style={{ padding: '7px 16px', fontSize: 13, borderRadius: 20, border: `2px solid ${motivosSel.has(m) ? BLUE : '#E5E7EB'}`, background: motivosSel.has(m) ? BLUE_LIGHT : 'white', color: motivosSel.has(m) ? BLUE : '#374151', cursor: 'pointer', fontWeight: motivosSel.has(m) ? 600 : 400, transition: 'all 0.1s' }}>
                         {motivosSel.has(m) ? '✓ ' : ''}{m}
                       </button>
                     ))}
                   </div>
 
                   {motivosSel.size > 0 && (
-                    <div className="fade-in" style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)' }}>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                        Motivo/s estandarizado/s para reporting
-                      </div>
+                    <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Motivos estandarizados para reporting</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {Array.from(motivosSel).map(m => {
-                          const estandar = motivosEstandarizados.find(me =>
-                            me.keywords.some(k => m.toLowerCase().includes(k))
-                          ) || motivosEstandarizados[motivosEstandarizados.length - 1]
+                          const est = motivosEstandarizados.find(me => me.keywords.some(k => m.toLowerCase().includes(k))) || motivosEstandarizados[motivosEstandarizados.length - 1]
                           return (
-                            <span key={m} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-green-border)', color: '#fff', fontWeight: 600 }}>
-                              {estandar.label}
+                            <span key={m} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 10, background: '#16A34A', color: 'white', fontWeight: 600 }}>
+                              {est.label}
                             </span>
                           )
                         })}
@@ -276,101 +270,125 @@ export function RetencionPage() {
                   )}
                 </div>
 
-                {/* Argumentario contextual */}
+                {/* Argumentario */}
                 {Array.from(motivosSel).filter(m => argumentario[m]).length > 0 && (
-                  <div className="card card-blue">
-                    <div className="card-title">💬 Argumentario sugerido</div>
+                  <div style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 12, padding: '16px 20px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 12 }}>💬 Argumentario sugerido</div>
                     {Array.from(motivosSel).filter(m => argumentario[m]).map(m => (
-                      <div key={m} style={{ fontSize: 11, color: 'var(--color-blue-dark)', lineHeight: 1.6, padding: '6px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 'var(--border-radius-sm)', marginBottom: 6, fontStyle: 'italic' }}>
+                      <div key={m} style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, padding: '8px 12px', background: 'rgba(255,255,255,0.6)', borderRadius: 8, marginBottom: 6, fontStyle: 'italic' }}>
                         {argumentario[m]}
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Ofertas de retención */}
-                <div className="card">
-                  <div className="card-title">Ofertas de retención disponibles</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                    {ofertas.map(of => (
-                      <div key={of.id} onClick={() => setOfertaSel(ofertaSel?.id === of.id ? null : of)}
-                        style={{ padding: '10px 12px', border: `1.5px solid ${ofertaSel?.id === of.id ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: ofertaSel?.id === of.id ? 'var(--color-blue-light)' : 'transparent', transition: 'all 0.1s' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 14 }}>{of.tipo === 'descuento' ? '💰' : '⬆️'}</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: ofertaSel?.id === of.id ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{of.titulo}</span>
+                {/* Ofertas de retención — Top 3 */}
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Ofertas de retención</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Top {ofertas.length} propuestas personalizadas para este cliente</div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(ofertas.length, 3)}, 1fr)`, gap: 12, marginBottom: 16 }}>
+                    {ofertas.slice(0, 3).map((of, idx) => {
+                      const sel = ofertaSel?.id === of.id
+                      return (
+                        <div key={of.id} onClick={() => setOfertaSel(sel ? null : of)}
+                          style={{ padding: '16px', border: `2px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white', transition: 'all 0.15s', boxShadow: sel ? `0 0 0 3px ${BLUE_LIGHT}` : 'none', position: 'relative' }}>
+                          {idx === 0 && (
+                            <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', fontSize: 10, padding: '2px 10px', borderRadius: 10, background: BLUE, color: 'white', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              ⭐ Recomendada
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, marginTop: idx === 0 ? 6 : 0 }}>
+                            <span style={{ fontSize: 20 }}>{of.tipo === 'descuento' ? '💰' : '⬆️'}</span>
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: of.tipo === 'descuento' ? '#DCFCE7' : '#F5F3FF', color: of.tipo === 'descuento' ? '#166534' : '#7C3AED', fontWeight: 700 }}>
+                              {of.tipo === 'descuento' ? 'Descuento' : 'Mejora'}
+                            </span>
                           </div>
-                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: of.tipo === 'descuento' ? 'var(--color-green-light)' : 'var(--color-purple-light)', color: of.tipo === 'descuento' ? 'var(--color-green-dark)' : 'var(--color-purple)', fontWeight: 700, textTransform: 'uppercase' }}>
-                            {of.tipo === 'descuento' ? 'Descuento' : 'Mejora'}
-                          </span>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: sel ? BLUE : '#111827', marginBottom: 6 }}>{of.titulo}</div>
+                          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 8, lineHeight: 1.5 }}>{of.descripcion}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#16A34A' }}>{of.detalle}</div>
+                          {sel && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: BLUE }}>✓ Seleccionada</div>}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 3 }}>{of.descripcion}</div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-green-dark)' }}>{of.detalle}</div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
-                  {ofertaSel && (
-                    <button onClick={aceptarOferta} disabled={procesando} className="btn-success" style={{ width: '100%', justifyContent: 'center', height: 38, fontSize: 13 }}>
-                      {procesando ? <><span className="spinner spinner-sm" /> Procesando...</> : '✓ Cliente acepta — confirmar oferta + OTP'}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {ofertaSel && (
+                      <button onClick={aceptarOferta} disabled={procesando}
+                        style={{ flex: 1, padding: '12px', background: '#16A34A', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        {procesando ? '⏳ Procesando...' : '✓ Cliente acepta — confirmar con OTP'}
+                      </button>
+                    )}
+                    <button onClick={() => setPaso('seleccion_baja')}
+                      style={{ flex: ofertaSel ? 0 : 1, padding: '12px 20px', background: '#FEF2F2', color: '#991B1B', border: '1.5px solid #FECACA', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      Cliente rechaza → Gestionar baja
                     </button>
-                  )}
+                  </div>
 
-                  <button onClick={() => setPaso('seleccion_baja')}
-                    className="btn-danger" style={{ width: '100%', justifyContent: 'center', marginTop: ofertaSel ? 8 : 0, fontSize: 12 }}>
-                    Cliente rechaza todas las ofertas → Gestionar baja
-                  </button>
+                  {/* MLP */}
+                  {ofertaSel && (
+                    <div style={{ marginTop: 10 }}>
+                      <button onClick={() => { setMlpEmail(clienteActivo.email || ''); setMostrarMLP(true) }}
+                        style={{ width: '100%', padding: '10px', border: `1.5px solid ${BLUE_BORDER}`, borderRadius: 8, background: BLUE_LIGHT, color: BLUE, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        📄 Me lo pienso (MLP) — Enviar propuesta al cliente
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
 
             {/* ── PASO 2: SELECCIÓN DE BAJA ── */}
             {paso === 'seleccion_baja' && (
-              <div className="card">
-                <div className="card-title">
-                  2. ¿Qué productos quiere dar de baja?
-                  {productosBaja.size > 0 && <span className="badge badge-err">{productosBaja.size} seleccionados</span>}
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 4 }}>
+                  ¿Qué productos quiere dar de baja?
+                  {productosBaja.size > 0 && <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#FEE2E2', color: '#991B1B', fontWeight: 600 }}>{productosBaja.size} seleccionados</span>}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-                  Selecciona los productos a dar de baja. El sistema calculará automáticamente el reposicionamiento necesario.
+                <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+                  Selecciona los productos. El sistema calculará automáticamente el reposicionamiento.
                 </div>
 
-                {clienteActivo.productos.map(p => {
-                  const seleccionado = productosBaja.has(p.id)
-                  return (
-                    <div key={p.id} onClick={() => toggleProductoBaja(p.id)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, border: `1.5px solid ${seleccionado ? 'var(--color-red-border)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: seleccionado ? 'var(--color-red-light)' : 'transparent', transition: 'all 0.1s' }}>
-                      <input type="checkbox" checked={seleccionado} readOnly style={{ cursor: 'pointer', width: 14, height: 14, flexShrink: 0, accentColor: 'var(--color-red-mid)' }} />
-                      <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>
-                        {p.tipo === 'fibra' ? '📡' : p.tipo === 'tv' ? '📺' : p.tipo === 'movil' ? '📱' : '☎️'}
-                      </span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: seleccionado ? 'var(--color-red-dark)' : 'var(--color-text-primary)' }}>{p.nombre}</div>
-                        {p.direccion && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{p.direccion}</div>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  {clienteActivo.productos.map(p => {
+                    const sel = productosBaja.has(p.id)
+                    return (
+                      <div key={p.id} onClick={() => toggleProductoBaja(p.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', border: `2px solid ${sel ? '#FECACA' : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: sel ? '#FEF2F2' : 'white', transition: 'all 0.1s' }}>
+                        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? '#EF4444' : '#D1D5DB'}`, background: sel ? '#EF4444' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {sel && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✕</span>}
+                        </div>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{p.tipo === 'fibra' ? '📡' : p.tipo === 'tv' ? '📺' : p.tipo === 'movil' ? '📱' : '☎️'}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: sel ? '#991B1B' : '#111827', textDecoration: sel ? 'line-through' : 'none' }}>{p.nombre}</div>
+                          {p.direccion && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{p.direccion}</div>}
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          {p.precio !== undefined && p.precio > 0 && (
+                            <div style={{ fontSize: 13, fontWeight: 700, color: sel ? '#EF4444' : '#111827' }}>{p.precio.toFixed(2)}€</div>
+                          )}
+                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: p.estado === 'activa' ? '#DCFCE7' : '#FEE2E2', color: p.estado === 'activa' ? '#166534' : '#991B1B', fontWeight: 600 }}>
+                            {p.estado}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        {p.precio !== undefined && p.precio > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: seleccionado ? 'var(--color-red)' : 'var(--color-text-primary)' }}>{p.precio.toFixed(2)}€</div>
-                        )}
-                        <span className={`pill ${p.estado === 'activa' ? 'pill-ok' : 'pill-err'}`} style={{ fontSize: 9 }}>{p.estado}</span>
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
 
-                {/* Preview de lo que queda */}
+                {/* Preview parque tras baja */}
                 {productosBaja.size > 0 && (
-                  <div style={{ marginTop: 12, padding: '10px 12px', background: esBajaTotal ? 'var(--color-red-light)' : 'var(--color-amber-light)', border: `1px solid ${esBajaTotal ? 'var(--color-red-border)' : 'var(--color-amber-border)'}`, borderRadius: 'var(--border-radius-md)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: esBajaTotal ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginBottom: 4 }}>
+                  <div style={{ padding: '12px 16px', background: esBajaTotal ? '#FEF2F2' : '#FFFBEB', border: `1px solid ${esBajaTotal ? '#FECACA' : '#FCD34D'}`, borderRadius: 10, marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: esBajaTotal ? '#991B1B' : '#92400E', marginBottom: 6 }}>
                       {esBajaTotal ? '⚠ Baja total — el cliente pierde todos los servicios' : '📋 Tras la baja el cliente mantiene:'}
                     </div>
                     {!esBajaTotal && clienteActivo.productos.filter(p => !productosBaja.has(p.id)).map(p => (
-                      <div key={p.id} style={{ fontSize: 11, color: 'var(--color-amber-dark)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="status-dot status-dot-ok" style={{ width: 6, height: 6 }} />
-                        {p.nombre}
+                      <div key={p.id} style={{ fontSize: 13, color: '#92400E', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{ color: '#16A34A' }}>✓</span> {p.nombre}
                       </div>
                     ))}
-                    <div style={{ fontSize: 11, fontWeight: 600, color: esBajaTotal ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginTop: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: esBajaTotal ? '#991B1B' : '#92400E', marginTop: 6, borderTop: '1px solid', borderColor: esBajaTotal ? '#FECACA' : '#FCD34D', paddingTop: 6 }}>
                       {esBajaTotal
                         ? 'No hay reposicionamiento posible'
                         : `Reposicionamiento sugerido: ${parqueTrasCalc.tipo === 'solo_fibra' ? 'Fibra sola' : parqueTrasCalc.tipo === 'convergente' ? `Convergente ${parqueTrasCalc.lineas} línea/s` : 'Solo móvil'}`
@@ -379,13 +397,13 @@ export function RetencionPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button onClick={() => setPaso('retencion')} className="btn-secondary" style={{ fontSize: 11 }}>← Atrás</button>
-                  <button
-                    onClick={() => { setPaso('reposicion'); buscarReposicion() }}
-                    disabled={productosBaja.size === 0}
-                    className="btn-primary"
-                    style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setPaso('retencion')}
+                    style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                    ← Atrás
+                  </button>
+                  <button onClick={() => { setPaso('reposicion'); buscarReposicion() }} disabled={productosBaja.size === 0}
+                    style={{ flex: 1, padding: '12px', background: productosBaja.size > 0 ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: productosBaja.size > 0 ? 'pointer' : 'not-allowed' }}>
                     Continuar → {esBajaTotal ? 'Confirmar baja total' : 'Ver reposicionamiento'}
                   </button>
                 </div>
@@ -394,54 +412,75 @@ export function RetencionPage() {
 
             {/* ── PASO 3: REPOSICIONAMIENTO ── */}
             {paso === 'reposicion' && (
-              <div className="card">
-                <div className="card-title">3. Reposicionamiento tras la baja</div>
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Reposicionamiento tras la baja</div>
+                <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+                  {esBajaTotal ? 'Baja total — sin reposicionamiento posible' : `Bundles compatibles con el parque resultante (${parqueTrasCalc.tipo === 'solo_fibra' ? 'Fibra sola' : parqueTrasCalc.tipo === 'convergente' ? `${parqueTrasCalc.lineas} línea/s + fibra` : 'Sin fibra'})`}
+                </div>
 
                 {esBajaTotal ? (
-                  <div className="alert alert-err" style={{ marginBottom: 12 }}>
-                    <span>⚠</span>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>Baja total — sin reposicionamiento</div>
-                      <div style={{ fontSize: 11, marginTop: 2 }}>El cliente perderá todos sus servicios. No hay bundle compatible que ofrecer.</div>
-                    </div>
+                  <div style={{ padding: '14px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#991B1B', marginBottom: 4 }}>⚠ Baja total</div>
+                    <div style={{ fontSize: 13, color: '#991B1B' }}>El cliente perderá todos sus servicios. No hay bundle compatible que ofrecer.</div>
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-                      Bundles compatibles con el parque resultante tras la baja
-                      <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                        {' '}({parqueTrasCalc.tipo === 'solo_fibra' ? 'Fibra sola' : parqueTrasCalc.tipo === 'convergente' ? `${parqueTrasCalc.lineas} línea/s + fibra` : 'Sin fibra'})
-                      </span>
-                    </div>
+                    {/* NBA en reposición */}
+                    {resultados.length > 0 && (() => {
+                      const nba = resultados.find(r => r.matchTipo === 'exacto') || resultados[0]
+                      const delta = nba.bundle.precio - totalParque
+                      return (
+                        <div style={{ marginBottom: 16, padding: '14px 16px', background: BLUE_LIGHT, border: `1.5px solid ${BLUE_BORDER}`, borderRadius: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: BLUE, color: 'white', fontWeight: 700 }}>⭐ NBA Recomendado</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{nba.bundle.nombre}</div>
+                              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{nba.bundle.descripcion}</div>
+                              <div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic', marginTop: 4 }}>
+                                💬 "Solución óptima para mantener los servicios esenciales del cliente con menor impacto económico"
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                              <div style={{ fontSize: 20, fontWeight: 700, color: BLUE }}>{(nba.bundle.precio * 1.21).toFixed(0)}€/mes</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: delta < 0 ? '#16A34A' : '#EF4444' }}>
+                                {delta < 0 ? `↓ Ahorra ${Math.abs(delta * 1.21).toFixed(2)}€/mes` : `↑ +${(delta * 1.21).toFixed(2)}€/mes`}
+                              </div>
+                              <button onClick={() => setBundleSel(nba.bundle)}
+                                style={{ marginTop: 6, padding: '6px 14px', background: BLUE, color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                Seleccionar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                     {buscado && resultados.length === 0 && (
-                      <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
+                      <div style={{ textAlign: 'center', padding: '24px', color: '#9CA3AF', fontSize: 13 }}>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
                         No hay bundles para el parque resultante
                       </div>
                     )}
 
                     {resultados.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
                         {resultados.map(r => {
                           const mc = matchColor(r.matchTipo)
-                          const isSelected = bundleSel?.id === r.bundle.id
+                          const sel = bundleSel?.id === r.bundle.id
                           const delta = r.bundle.precio - totalParque
-
                           return (
-                            <div key={r.bundle.id} onClick={() => setBundleSel(isSelected ? null : r.bundle)}
-                              style={{ padding: '10px 12px', border: `1.5px solid ${isSelected ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: isSelected ? 'var(--color-blue-light)' : 'transparent', transition: 'all 0.1s' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                <div style={{ fontSize: 12, fontWeight: 700 }}>{r.bundle.nombre}</div>
-                                <div style={{ textAlign: 'right' }}>
-                                  <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{r.bundle.precio.toFixed(2)}€</div>
-                                  <div style={{ fontSize: 10, fontWeight: 600, color: delta < 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
-                                    {delta < 0 ? '↓' : '↑'} {Math.abs(delta).toFixed(2)}€/mes vs. actual
-                                  </div>
-                                </div>
+                            <div key={r.bundle.id} onClick={() => setBundleSel(sel ? null : r.bundle)}
+                              style={{ padding: '14px', border: `2px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white', transition: 'all 0.1s' }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: sel ? BLUE : '#111827', marginBottom: 4 }}>{r.bundle.nombre}</div>
+                              <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>{r.bundle.descripcion}</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 4 }}>{(r.bundle.precio * 1.21).toFixed(0)}€/mes</div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: delta < 0 ? '#16A34A' : '#EF4444', marginBottom: 8 }}>
+                                {delta < 0 ? '↓' : '↑'} {Math.abs(delta * 1.21).toFixed(2)}€/mes vs actual
                               </div>
-                              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>{r.bundle.descripcion}</div>
-                              <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: mc.bg, border: `1px solid ${mc.border}`, color: mc.color, fontWeight: 600 }}>{mc.label}</span>
+                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: mc.bg, border: `1px solid ${mc.border}`, color: mc.color, fontWeight: 600 }}>{mc.label}</span>
+                              {sel && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: BLUE }}>✓ Seleccionado</div>}
                             </div>
                           )
                         })}
@@ -450,16 +489,20 @@ export function RetencionPage() {
 
                     {/* Add-ons TV */}
                     {bundleSel && bundleSel.categoria !== 'fibra_sola' && (
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>📺 TV (opcional)</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>📺 Televisión (opcional)</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {catalogoAddonsTV.map(a => {
                             const sel = addonsTVSel.has(a.id)
                             return (
-                              <button key={a.id} onClick={() => toggleAddonTV(a.id)}
-                                style={{ padding: '4px 10px', fontSize: 11, borderRadius: 'var(--border-radius-full)', border: `1.5px solid ${sel ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: sel ? 'var(--color-blue-light)' : 'none', color: sel ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: sel ? 600 : 400 }}>
-                                {a.nombre} +{a.precio}€
-                              </button>
+                              <div key={a.id} onClick={() => toggleAddonTV(a.id)}
+                                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', border: `1.5px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white' }}>
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? BLUE : '#111827' }}>{a.nombre}</div>
+                                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{a.canales.slice(0, 3).join(' · ')}</div>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: sel ? BLUE : '#374151' }}>+{a.precio}€/mes</span>
+                              </div>
                             )
                           })}
                         </div>
@@ -468,13 +511,13 @@ export function RetencionPage() {
                   </>
                 )}
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setPaso('seleccion_baja')} className="btn-secondary" style={{ fontSize: 11 }}>← Atrás</button>
-                  <button
-                    onClick={() => setPaso('firma')}
-                    disabled={!esBajaTotal && !bundleSel}
-                    className="btn-primary"
-                    style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setPaso('seleccion_baja')}
+                    style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                    ← Atrás
+                  </button>
+                  <button onClick={() => setPaso('firma')} disabled={!esBajaTotal && !bundleSel}
+                    style={{ flex: 1, padding: '12px', background: (esBajaTotal || bundleSel) ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (esBajaTotal || bundleSel) ? 'pointer' : 'not-allowed' }}>
                     Continuar → Resumen y firma
                   </button>
                 </div>
@@ -483,119 +526,168 @@ export function RetencionPage() {
 
             {/* ── PASO 4: FIRMA ── */}
             {paso === 'firma' && (
-              <div className="card">
-                <div className="card-title">4. Resumen y confirmación</div>
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 16 }}>Resumen y confirmación</div>
 
-                <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '12px 14px', marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Resumen de la gestión</div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-red-dark)', marginBottom: 4 }}>Productos que se dan de baja:</div>
-                    {clienteActivo.productos.filter(p => productosBaja.has(p.id)).map(p => (
-                      <div key={p.id} style={{ fontSize: 11, color: 'var(--color-red-dark)', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-                        <span>✕</span> {p.nombre} {p.precio ? `(${p.precio.toFixed(2)}€)` : ''}
-                      </div>
-                    ))}
+                {/* Venta consciente */}
+                <div style={{ padding: '14px 16px', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 10, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 10 }}>💬 Venta consciente — repasa con el cliente</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#374151' }}>
+                    <div>✓ Productos que se dan de baja: <strong>{clienteActivo.productos.filter(p => productosBaja.has(p.id)).map(p => p.nombre).join(', ')}</strong></div>
+                    {!esBajaTotal && bundleSel && (
+                      <>
+                        <div>✓ Nueva tarifa: <strong>{bundleSel.nombre}</strong> — <strong>{(precioNuevo * 1.21).toFixed(2)}€/mes con IVA</strong></div>
+                        <div>✓ {totalParque > precioNuevo ? `Ahorro de ${((totalParque - precioNuevo) * 1.21).toFixed(2)}€/mes respecto a la tarifa actual` : `Diferencia de ${((precioNuevo - totalParque) * 1.21).toFixed(2)}€/mes respecto a la tarifa actual`}</div>
+                      </>
+                    )}
+                    {esBajaTotal && <div>⚠ Baja total — el cliente perderá todos sus servicios.</div>}
                   </div>
+                </div>
 
+                {/* Resumen */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Productos que se dan de baja:</div>
+                  {clienteActivo.productos.filter(p => productosBaja.has(p.id)).map(p => (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 10px', background: '#FEF2F2', borderRadius: 6 }}>
+                      <span style={{ color: '#991B1B' }}>✕ {p.nombre}</span>
+                      {p.precio ? <span style={{ color: '#991B1B', fontWeight: 600 }}>{p.precio.toFixed(2)}€</span> : null}
+                    </div>
+                  ))}
                   {!esBajaTotal && bundleSel && (
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-green-dark)', marginBottom: 4 }}>Nueva tarifa:</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-green-dark)' }}>
-                        {bundleSel.nombre} — {(precioNuevo * 1.21).toFixed(2)}€/mes con IVA
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#16A34A', marginTop: 8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nueva tarifa:</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 10px', background: '#F0FDF4', borderRadius: 6 }}>
+                        <span style={{ color: '#166534', fontWeight: 600 }}>{bundleSel.nombre}</span>
+                        <span style={{ color: '#166534', fontWeight: 700 }}>{(precioNuevo * 1.21).toFixed(2)}€/mes</span>
                       </div>
                       {addonsTVSel.size > 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: '#6B7280', paddingLeft: 10 }}>
                           + {catalogoAddonsTV.filter(a => addonsTVSel.has(a.id)).map(a => a.nombre).join(' · ')}
                         </div>
                       )}
-                    </div>
-                  )}
-
-                  {esBajaTotal && (
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-red-dark)' }}>
-                      Baja total — sin nueva tarifa
-                    </div>
+                    </>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setPaso('reposicion')} className="btn-secondary" style={{ fontSize: 11 }}>← Atrás</button>
-                  <button onClick={confirmarBaja} disabled={firmando} className="btn-danger" style={{ flex: 1, justifyContent: 'center', height: 38, fontSize: 13 }}>
-                    {firmando
-                      ? <><span className="spinner spinner-sm" /> Procesando...</>
-                      : `🔐 Confirmar baja${!esBajaTotal && bundleSel ? ' + nueva tarifa' : ''} con OTP`
-                    }
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setPaso('reposicion')}
+                    style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                    ← Atrás
+                  </button>
+                  <button onClick={confirmarBaja} disabled={firmando}
+                    style={{ flex: 1, padding: '12px', background: '#EF4444', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    {firmando ? '⏳ Procesando...' : `🔐 Confirmar baja${!esBajaTotal && bundleSel ? ' + nueva tarifa' : ''} con OTP`}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Panel derecho — info cliente */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Panel derecho */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* Parque actual */}
-            <div className="card">
-              <div className="card-title">Parque actual</div>
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Parque actual</div>
               {clienteActivo.productos.map(p => (
-                <div key={p.id} className="table-row" style={{ opacity: productosBaja.has(p.id) ? 0.4 : 1 }}>
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #F3F4F6', opacity: productosBaja.has(p.id) ? 0.4 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {productosBaja.has(p.id) && <span style={{ fontSize: 10, color: 'var(--color-red)', fontWeight: 700 }}>✕</span>}
-                    <span className="table-row-label" style={{ textDecoration: productosBaja.has(p.id) ? 'line-through' : 'none' }}>{p.nombre}</span>
+                    {productosBaja.has(p.id) && <span style={{ fontSize: 10, color: '#EF4444', fontWeight: 700 }}>✕</span>}
+                    <span style={{ fontSize: 13, color: '#374151', textDecoration: productosBaja.has(p.id) ? 'line-through' : 'none' }}>{p.nombre}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {p.precio !== undefined && p.precio > 0 && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>{p.precio.toFixed(2)}€</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{p.precio.toFixed(2)}€</span>
                     )}
-                    <span className={`status-dot ${p.estado === 'activa' ? 'status-dot-ok' : 'status-dot-err'}`} style={{ width: 6, height: 6 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.estado === 'activa' ? '#16A34A' : '#EF4444' }} />
                   </div>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, marginTop: 8, paddingTop: 8, borderTop: '2px solid var(--color-border-secondary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, marginTop: 10, paddingTop: 10, borderTop: '2px solid #E5E7EB' }}>
                 <span>Total actual</span>
-                <span style={{ fontFamily: 'var(--font-mono)' }}>{(totalParque * 1.21).toFixed(2)}€/mes</span>
+                <span style={{ color: BLUE }}>{(totalParque * 1.21).toFixed(2)}€/mes</span>
               </div>
             </div>
 
             {/* Factura de transición */}
             {bundleSel && !esBajaTotal && (
-              <div className="card card-blue">
-                <div className="card-title">Factura de transición</div>
+              <div style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 12, padding: '16px 20px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 12 }}>Factura de transición</div>
                 {[
-                  { label: 'Tarifa actual', val: `${(totalParque * 1.21).toFixed(2)}€`, color: 'var(--color-text-primary)' },
-                  { label: 'Nueva tarifa', val: `${(precioNuevo * 1.21).toFixed(2)}€`, color: 'var(--color-blue-dark)' },
-                  {
-                    label: totalParque > precioNuevo ? 'Ahorro mensual' : 'Incremento',
-                    val: `${Math.abs((totalParque - precioNuevo) * 1.21).toFixed(2)}€/mes`,
-                    color: totalParque > precioNuevo ? 'var(--color-green)' : 'var(--color-red)'
-                  },
+                  { label: 'Tarifa actual', val: `${(totalParque * 1.21).toFixed(2)}€`, color: '#374151' },
+                  { label: 'Nueva tarifa', val: `${(precioNuevo * 1.21).toFixed(2)}€`, color: BLUE },
+                  { label: totalParque > precioNuevo ? 'Ahorro mensual' : 'Incremento', val: `${Math.abs((totalParque - precioNuevo) * 1.21).toFixed(2)}€/mes`, color: totalParque > precioNuevo ? '#16A34A' : '#EF4444' },
                 ].map(row => (
-                  <div key={row.label} className="table-row">
-                    <span className="table-row-label">{row.label}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: row.color }}>{row.val}</span>
+                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid #E0E7FF' }}>
+                    <span style={{ color: '#6B7280' }}>{row.label}</span>
+                    <span style={{ fontWeight: 700, color: row.color }}>{row.val}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Riesgo */}
-            <div className="card">
-              <div className="card-title">Indicadores</div>
+            {/* Indicadores */}
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Indicadores</div>
               {[
-                { label: 'Satisfacción', val: clienteActivo.satisfaccionRiesgo, pill: clienteActivo.satisfaccionRiesgo === 'ok' ? 'pill-ok' : clienteActivo.satisfaccionRiesgo === 'en_riesgo' ? 'pill-warn' : 'pill-err' },
-                { label: 'Riesgo scoring', val: clienteActivo.riesgoScore, pill: clienteActivo.riesgoScore === 'bajo' ? 'pill-ok' : clienteActivo.riesgoScore === 'medio' ? 'pill-warn' : 'pill-err' },
-                { label: 'Sin resolver', val: `${clienteActivo.historial.filter(h => !h.resuelto).length} llamadas`, pill: clienteActivo.historial.filter(h => !h.resuelto).length > 2 ? 'pill-err' : 'pill-ok' },
+                { label: 'Satisfacción', val: clienteActivo.satisfaccionRiesgo, color: clienteActivo.satisfaccionRiesgo === 'ok' ? '#16A34A' : clienteActivo.satisfaccionRiesgo === 'en_riesgo' ? '#D97706' : '#EF4444', bg: clienteActivo.satisfaccionRiesgo === 'ok' ? '#DCFCE7' : clienteActivo.satisfaccionRiesgo === 'en_riesgo' ? '#FEF3C7' : '#FEE2E2' },
+                { label: 'Riesgo scoring', val: clienteActivo.riesgoScore, color: clienteActivo.riesgoScore === 'bajo' ? '#16A34A' : clienteActivo.riesgoScore === 'medio' ? '#D97706' : '#EF4444', bg: clienteActivo.riesgoScore === 'bajo' ? '#DCFCE7' : clienteActivo.riesgoScore === 'medio' ? '#FEF3C7' : '#FEE2E2' },
+                { label: 'Sin resolver', val: `${clienteActivo.historial.filter(h => !h.resuelto).length} llamadas`, color: clienteActivo.historial.filter(h => !h.resuelto).length > 2 ? '#EF4444' : '#16A34A', bg: clienteActivo.historial.filter(h => !h.resuelto).length > 2 ? '#FEE2E2' : '#DCFCE7' },
               ].map(row => (
-                <div key={row.label} className="table-row">
-                  <span className="table-row-label">{row.label}</span>
-                  <span className={`pill ${row.pill}`} style={{ fontSize: 10 }}>{row.val}</span>
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #F3F4F6' }}>
+                  <span style={{ fontSize: 12, color: '#6B7280' }}>{row.label}</span>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: row.bg, color: row.color, fontWeight: 600 }}>{row.val}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
       )}
-    </>
+
+      {/* Modal MLP */}
+      {mostrarMLP && ofertaSel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: '24px', width: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>Me lo pienso (MLP)</div>
+                <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>Guardar propuesta y enviar al cliente</div>
+              </div>
+              <button onClick={() => setMostrarMLP(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9CA3AF' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '12px 14px', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 8, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 4 }}>{ofertaSel.titulo}</div>
+              <div style={{ fontSize: 12, color: '#374151' }}>{ofertaSel.descripcion}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#16A34A', marginTop: 4 }}>{ofertaSel.detalle}</div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Enviar propuesta a</div>
+              <input className="input" style={{ height: 44 }} placeholder="Email del cliente"
+                value={mlpEmail} onChange={e => setMlpEmail(e.target.value)} />
+            </div>
+
+            {mlpEnviado ? (
+              <div style={{ padding: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534', fontWeight: 600, textAlign: 'center' }}>
+                ✓ Propuesta enviada · Válida 48h · El cliente recibirá el resumen en {mlpEmail}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => { setMlpEnviado(true); setTimeout(() => { setMostrarMLP(false); setMlpEnviado(false) }, 2500) }}
+                  disabled={!mlpEmail.trim()}
+                  style={{ flex: 1, padding: '12px', background: mlpEmail.trim() ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: mlpEmail.trim() ? 'pointer' : 'not-allowed' }}>
+                  📧 Enviar por email
+                </button>
+                <button onClick={() => setMostrarMLP(false)}
+                  style={{ padding: '12px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

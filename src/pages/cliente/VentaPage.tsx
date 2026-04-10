@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { catalogoBundles, catalogoAddonsTV, buscarBundles } from '../../data/mockData'
 import type { Bundle, ResultadoBusquedaBundle } from '../../types'
+import { NuevaVentaPage } from '../venta/NuevaVentaPage'
 
 type ModoVenta = 'selector' | 'cambio_tarifa' | 'alta_servicio' | 'linea_adicional'
 
@@ -26,6 +27,12 @@ export function VentaPage() {
   const [firmado, setFirmado] = useState(false)
   const [tipoMovimiento, setTipoMovimiento] = useState<'alta' | 'porta' | 'migra'>('alta')
   const [numeroPorta, setNumeroPorta] = useState('')
+  const [tipoAltaServicio, setTipoAltaServicio] = useState<'movil' | 'convergente' | null>(null)
+  const [mostrarMLP, setMostrarMLP] = useState(false)
+  const [mlpEmail, setMlpEmail] = useState('')
+  const [mlpEnviado, setMlpEnviado] = useState(false)
+  const [simTipo, setSimTipo] = useState<'sim' | 'esim'>('sim')
+  const [entrega, setEntrega] = useState<'domicilio' | 'tienda'>('domicilio')
 
   if (!clienteActivo) return null
 
@@ -88,6 +95,7 @@ export function VentaPage() {
     setResultados([])
     setBundleSel(null)
     setFirmado(false)
+    setTipoAltaServicio(null)
   }
 
   const matchColor = (tipo: string) => {
@@ -152,7 +160,7 @@ export function VentaPage() {
               modo: 'alta_servicio' as ModoVenta,
               icono: '➕',
               titulo: 'Alta de servicio',
-              desc: 'Añadir un nuevo servicio o contratar desde cero. Búsqueda libre de bundles sin partir del parque actual.',
+              desc: 'Alta línea Móvil o BAF / BAF Convergente. Mismo proceso que nueva contratación con datos del cliente precargados.',
               color: 'var(--color-green)',
               bgColor: 'var(--color-green-light)',
               border: 'var(--color-green-border)',
@@ -186,89 +194,41 @@ export function VentaPage() {
 
   // ── LÍNEA ADICIONAL ──
   if (modo === 'linea_adicional') {
-    const opcionesLinea = [
-      { id: 'linea-10', label: '10 GB', precio: 8 },
-      { id: 'linea-30', label: '30 GB', precio: 12 },
-      { id: 'linea-inf', label: 'Ilimitada', precio: 18 },
-    ]
-    const [lineaSel, setLineaSel] = useState<string | null>(null)
-    const lineaObj = opcionesLinea.find(l => l.id === lineaSel)
-
     return (
-      <>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Añadir línea adicional</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-              Sobre el bundle {bundleActualObj?.nombre || clienteActivo.bundleActual}
-            </div>
-          </div>
-          <button onClick={resetear} className="btn-secondary" style={{ fontSize: 11 }}>← Volver</button>
-        </div>
-
-        <div className="grid2">
-          <div className="card">
-            <div className="card-title">Selecciona la tarifa de datos</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {opcionesLinea.map(l => (
-                <div key={l.id} onClick={() => setLineaSel(l.id)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', border: `1.5px solid ${lineaSel === l.id ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: lineaSel === l.id ? 'var(--color-blue-light)' : 'transparent', transition: 'all 0.1s' }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: lineaSel === l.id ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>Línea {l.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>Línea adicional convergente</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: lineaSel === l.id ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>+{l.precio.toFixed(2)}€</div>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>/mes</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {lineaSel && !firmado && (
-              <button onClick={firmar} disabled={firmando} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12, height: 38, fontSize: 13 }}>
-                {firmando ? <><span className="spinner spinner-sm" /> Enviando OTP...</> : '🔐 Confirmar y firmar con OTP'}
-              </button>
-            )}
-
-            {firmado && (
-              <div className="alert alert-ok" style={{ marginTop: 12 }}>
-                <span>✓</span>
-                <div>
-                  <div style={{ fontWeight: 700 }}>Línea adicional contratada</div>
-                  <div style={{ fontSize: 11, marginTop: 2 }}>OTP verificado · La nueva línea estará activa en 24h</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <div className="card-title">Resumen</div>
-            <div className="table-row">
-              <span className="table-row-label">Bundle actual</span>
-              <span className="table-row-value">{bundleActualObj?.nombre || clienteActivo.bundleActual}</span>
-            </div>
-            <div className="table-row">
-              <span className="table-row-label">Nueva línea</span>
-              <span className="table-row-value">{lineaObj ? `${lineaObj.label}` : '—'}</span>
-            </div>
-            <div className="table-row">
-              <span className="table-row-label">Coste adicional</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-blue)' }}>{lineaObj ? `+${lineaObj.precio.toFixed(2)}€/mes` : '—'}</span>
-            </div>
-            <div style={{ borderTop: '2px solid var(--color-border-secondary)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700 }}>
-              <span>Total nuevo</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue)' }}>
-                {lineaObj ? ((parqueActualPrecio + lineaObj.precio) * 1.21).toFixed(2) : (parqueActualPrecio * 1.21).toFixed(2)}€/mes
-              </span>
-            </div>
-          </div>
-        </div>
-      </>
+      <NuevaVentaPage
+        tipoForzado="movil"
+        clientePreCargado={{
+          dni: clienteActivo.dni,
+          nombre: clienteActivo.nombre,
+          apellidos: clienteActivo.apellidos,
+          email: clienteActivo.email,
+          telefono: clienteActivo.telefono,
+          iban: '',
+          scoringOK: clienteActivo.riesgoScore !== 'alto',
+        }}
+      />
     )
   }
 
-  // ── CAMBIO TARIFA / ALTA SERVICIO ──
+  // ── ALTA SERVICIO ──
+  if (modo === 'alta_servicio') {
+    return (
+      <NuevaVentaPage
+        tipoForzado="convergente"
+        clientePreCargado={{
+          dni: clienteActivo.dni,
+          nombre: clienteActivo.nombre,
+          apellidos: clienteActivo.apellidos,
+          email: clienteActivo.email,
+          telefono: clienteActivo.telefono,
+          iban: '',
+          scoringOK: clienteActivo.riesgoScore !== 'alto',
+        }}
+      />
+    )
+  }
+
+  // ── CAMBIO TARIFA ──
   const titulos = {
     cambio_tarifa: { titulo: 'Cambiar tarifa', sub: 'Reposicionamiento sobre bundle actual · El sistema parte de la tarifa actual' },
     alta_servicio: { titulo: 'Alta de servicio', sub: 'Nueva contratación · Búsqueda libre de bundles' },
@@ -293,22 +253,6 @@ export function VentaPage() {
           <button onClick={resetear} className="btn-secondary" style={{ fontSize: 11 }}>← Volver</button>
         </div>
       </div>
-
-      {/* Tipo movimiento solo en alta */}
-      {modo === 'alta_servicio' && (
-        <div style={{ background: 'var(--color-background-primary)', border: '1px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Movimiento:</div>
-          {(['alta', 'porta', 'migra'] as const).map(t => (
-            <button key={t} onClick={() => setTipoMovimiento(t)}
-              style={{ padding: '3px 10px', fontSize: 11, borderRadius: 'var(--border-radius-full)', border: `1.5px solid ${tipoMovimiento === t ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: tipoMovimiento === t ? 'var(--color-blue-light)' : 'none', color: tipoMovimiento === t ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: tipoMovimiento === t ? 600 : 400 }}>
-              {t === 'alta' ? 'Alta nueva' : t === 'porta' ? 'Portabilidad' : 'Migración prepago'}
-            </button>
-          ))}
-          {tipoMovimiento === 'porta' && (
-            <input value={numeroPorta} onChange={e => setNumeroPorta(e.target.value)} placeholder="Número a portar..." className="input" style={{ width: 160, height: 28 }} />
-          )}
-        </div>
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12 }}>
         {/* Selector necesidades */}
@@ -398,6 +342,16 @@ export function VentaPage() {
                 )}
               </div>
 
+              {tieneFusion && (
+                <div className="warning-banner" style={{ marginBottom: 8 }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
+                  <div style={{ fontSize: 11 }}>
+                    <strong>Porfolio descatalogado — {clienteActivo.porfolio.toUpperCase()}</strong>
+                    <div style={{ opacity: 0.85, marginTop: 2 }}>La venta requiere migración a "mi Movistar" y puede implicar cambios en la tarificación.</div>
+                  </div>
+                </div>
+              )}
+
               {resultados.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
                   <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
@@ -441,6 +395,11 @@ export function VentaPage() {
                               {r.bundle.tag}
                             </span>
                           )}
+                          {r.matchTipo === 'exacto' && !esMismoBundle && (
+                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', color: 'var(--color-blue-dark)', fontWeight: 600 }}>
+                              ⭐ NBA
+                            </span>
+                          )}
                         </div>
 
                         {r.diferencias.length > 0 && (
@@ -457,6 +416,38 @@ export function VentaPage() {
               )}
             </div>
           )}
+
+          {/* Propuestas alternativas */}
+          {bundleSel && (() => {
+            const propDown = resultados.filter(r => r.bundle.precio < bundleSel.precio && r.bundle.id !== clienteActivo.bundleActual).sort((a, b) => b.bundle.precio - a.bundle.precio)[0]?.bundle || null
+            const propUp = resultados.filter(r => r.bundle.precio > bundleSel.precio && r.bundle.id !== clienteActivo.bundleActual).sort((a, b) => a.bundle.precio - b.bundle.precio)[0]?.bundle || null
+            const props = [
+              { key: 'down', label: '↓ Down', bundle: propDown, color: 'var(--color-amber-dark)', bg: 'var(--color-amber-light)', border: 'var(--color-amber-border)' },
+              { key: 'base', label: '= Base', bundle: bundleSel, color: 'var(--color-blue-dark)', bg: 'var(--color-blue-light)', border: 'var(--color-blue-mid)' },
+              { key: 'up',   label: '↑ Up',   bundle: propUp,  color: 'var(--color-green-dark)', bg: 'var(--color-green-light)', border: 'var(--color-green-border)' },
+            ] as const
+            return (
+              <div className="card">
+                <div className="card-title">🎯 Propuestas alternativas</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  {props.map(p => (
+                    <div key={p.key} onClick={() => p.bundle && setBundleSel(p.bundle)}
+                      style={{ padding: '10px 12px', border: `1.5px solid ${p.bundle ? p.border : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-md)', cursor: p.bundle ? 'pointer' : 'default', background: p.bundle ? p.bg : 'var(--color-background-secondary)', opacity: p.bundle ? 1 : 0.45, transition: 'all 0.1s' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: p.bundle ? p.color : 'var(--color-text-tertiary)', marginBottom: 4 }}>{p.label}</div>
+                      {p.bundle ? (
+                        <>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: p.color, marginBottom: 2, lineHeight: 1.3 }}>{p.bundle.nombre}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: p.color }}>{p.bundle.precio.toFixed(2)}€</div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>No disponible</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Add-ons TV */}
           {bundleSel && bundleSel.categoria !== 'fibra_sola' && (
@@ -536,6 +527,34 @@ export function VentaPage() {
                   </div>
                 )}
 
+                {/* Provisión SIM/eSIM */}
+                {modo !== 'cambio_tarifa' && bundleSel && bundleSel.ingredientes.lineas && bundleSel.ingredientes.lineas.length > 0 && (
+                  <div style={{ padding: '10px 12px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 8 }}>📶 Provisión</div>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      {(['sim', 'esim'] as const).map(t => (
+                        <button key={t} onClick={() => setSimTipo(t)}
+                          style={{ flex: 1, padding: '5px 0', fontSize: 11, fontWeight: simTipo === t ? 700 : 400, border: `1.5px solid ${simTipo === t ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-md)', background: simTipo === t ? 'var(--color-blue-light)' : 'var(--color-background-primary)', color: simTipo === t ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                          {t === 'sim' ? '💳 SIM física' : '📲 eSIM'}
+                        </button>
+                      ))}
+                    </div>
+                    {simTipo === 'esim' && (
+                      <div style={{ fontSize: 10, color: 'var(--color-blue-dark)', background: 'var(--color-blue-light)', borderRadius: 'var(--border-radius-sm)', padding: '4px 8px', marginBottom: 8 }}>
+                        Se enviará QR al email para activación inmediata
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {(['domicilio', 'tienda'] as const).map(t => (
+                        <button key={t} onClick={() => setEntrega(t)}
+                          style={{ flex: 1, padding: '5px 0', fontSize: 11, fontWeight: entrega === t ? 700 : 400, border: `1.5px solid ${entrega === t ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-md)', background: entrega === t ? 'var(--color-blue-light)' : 'var(--color-background-primary)', color: entrega === t ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                          {t === 'domicilio' ? '🏠 Domicilio' : '🏪 Tienda'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {firmado ? (
                   <div className="alert alert-ok">
                     <span>✓</span>
@@ -551,7 +570,7 @@ export function VentaPage() {
                     <button onClick={firmar} disabled={firmando} className="btn-primary" style={{ width: '100%', justifyContent: 'center', height: 36, fontSize: 13, marginBottom: 6 }}>
                       {firmando ? <><span className="spinner spinner-sm" /> Enviando OTP...</> : '🔐 Firmar con OTP'}
                     </button>
-                    <button onClick={resetear} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
+                    <button onClick={() => { setMlpEmail(clienteActivo.email || ''); setMostrarMLP(true) }} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
                       📄 Me lo pienso (MLP)
                     </button>
                   </>
@@ -560,22 +579,76 @@ export function VentaPage() {
             )}
           </div>
 
-          {/* Parque actual */}
-          <div className="card">
-            <div className="card-title">Parque actual</div>
-            {clienteActivo.productos.filter(p => (p.precio || 0) > 0).map(p => (
-              <div key={p.id} className="table-row">
-                <span className="table-row-label" style={{ fontSize: 11 }}>{p.nombre}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>{(p.precio || 0).toFixed(2)}€</span>
-              </div>
-            ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, marginTop: 8, paddingTop: 8, borderTop: '2px solid var(--color-border-secondary)' }}>
-              <span>Total actual</span>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{(parqueActualPrecio * 1.21).toFixed(2)}€/mes</span>
+          {/* Calculadora ARPU global */}
+          <div className="card" style={{ border: '1.5px solid var(--color-blue-mid)', background: 'var(--color-blue-light)' }}>
+            <div className="card-title" style={{ color: 'var(--color-blue-dark)' }}>
+              📊 Calculadora ARPU
             </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+              {clienteActivo.productos.filter(p => (p.precio || 0) > 0).map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-blue-dark)' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{p.nombre}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, flexShrink: 0 }}>{(p.precio || 0).toFixed(2)}€</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--color-blue-mid)', paddingTop: 8, marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)' }}>
+                <span>ARPU actual (c/IVA)</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>{(parqueActualPrecio * 1.21).toFixed(2)}€</span>
+              </div>
+            </div>
+            {bundleSel && (
+              <div className="fade-in" style={{ borderTop: '1px solid var(--color-blue-mid)', paddingTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: precioTotal() > parqueActualPrecio ? 'var(--color-green-dark)' : 'var(--color-red-dark)' }}>
+                  <span>ARPU nuevo (c/IVA)</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{(precioTotal() * 1.21).toFixed(2)}€</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: precioTotal() > parqueActualPrecio ? 'var(--color-green-dark)' : 'var(--color-amber-dark)', marginTop: 4 }}>
+                  <span>{precioTotal() > parqueActualPrecio ? '↑ Incremento' : '↓ Reducción'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{precioTotal() > parqueActualPrecio ? '+' : ''}{((precioTotal() - parqueActualPrecio) * 1.21).toFixed(2)}€/mes</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Modal MLP */}
+      {mostrarMLP && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card" style={{ width: 360, maxWidth: '90vw' }}>
+            <div className="card-title">📄 Enviar propuesta MLP</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+              Se enviará un resumen de la oferta al cliente para que la consulte cuando quiera.
+            </div>
+            {bundleSel && (
+              <div style={{ padding: '8px 10px', background: 'var(--color-blue-light)', borderRadius: 'var(--border-radius-md)', marginBottom: 12, fontSize: 12 }}>
+                <div style={{ fontWeight: 700, color: 'var(--color-blue-dark)', marginBottom: 2 }}>{bundleSel.nombre}</div>
+                <div style={{ color: 'var(--color-blue-dark)' }}>{(bundleSel.precio * 1.21).toFixed(2)}€/mes (c/IVA)</div>
+              </div>
+            )}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Email del cliente</div>
+              <input value={mlpEmail} onChange={e => setMlpEmail(e.target.value)} placeholder="email@dominio.com"
+                style={{ width: '100%', padding: '7px 10px', fontSize: 12, border: '1.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            </div>
+            {mlpEnviado ? (
+              <div className="alert alert-ok"><span>✓</span><div>MLP enviado correctamente</div></div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setMostrarMLP(false)} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>Cancelar</button>
+                <button
+                  onClick={() => { setMlpEnviado(true); setTimeout(() => { setMostrarMLP(false); setMlpEnviado(false) }, 2000) }}
+                  disabled={!mlpEmail.trim() || !mlpEmail.includes('@')}
+                  className="btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                  Enviar MLP
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

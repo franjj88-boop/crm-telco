@@ -17,13 +17,24 @@ export function DispositivosPage() {
   const [seleccionado, setSeleccionado] = useState<Dispositivo | null>(null)
   const [comparando, setComparando] = useState<Dispositivo[]>([])
   const [enCesta, setEnCesta] = useState<Dispositivo[]>([])
-  const [modalidad, setModalidad] = useState<'mensual' | 'libre'>('mensual')
+
   const [firmado, setFirmado] = useState(false)
   const [firmando, setFirmando] = useState(false)
 
   if (!clienteActivo) return null
 
   const limiteCredito = clienteActivo.riesgoScore === 'alto' ? 500 : 2000
+  const [mostrarVentaConsciente, setMostrarVentaConsciente] = useState(false)
+  const [modalidadDetalle, setModalidadDetalle] = useState<'mensual' | 'libre' | 'rtr'>('mensual')
+
+  // NBA — dispositivos recomendados según perfil cliente
+  const dispositivosNBA = catalogoDispositivos
+    .filter(d => {
+      if (clienteActivo.riesgoScore === 'alto') return d.precioLibre <= 500
+      if (clienteActivo.productos.some(p => p.tipo === 'movil')) return d.destacado
+      return true
+    })
+    .map(d => d.id)
 
   const filtrados = catalogoDispositivos
     .filter(d => categoria === 'todos' || d.categoria === categoria)
@@ -199,8 +210,11 @@ export function DispositivosPage() {
               onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = 'translateY(0)' }}
             >
               {/* Badges */}
-              {d.destacado && !fuera && (
-                <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, padding: '2px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue)', color: '#fff', fontWeight: 700 }}>TOP</div>
+              {dispositivosNBA.includes(d.id) && !fuera && (
+                <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, padding: '2px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue)', color: '#fff', fontWeight: 700 }}>⭐ NBA</div>
+              )}
+              {d.destacado && !fuera && !dispositivosNBA.includes(d.id) && (
+                <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, padding: '2px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-purple)', color: '#fff', fontWeight: 700 }}>TOP</div>
               )}
               {fuera && (
                 <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, padding: '2px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-red-mid)', color: '#fff', fontWeight: 700 }}>LCD</div>
@@ -255,22 +269,28 @@ export function DispositivosPage() {
               </div>
             </div>
 
-            {/* Modalidades */}
+            {/* Modalidades unificadas */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {(['mensual', 'libre'] as const).map(m => (
+              {([
+                { id: 'mensual', label: `Financiado ${seleccionado.mesesFinanciacion}m`, precio: `${seleccionado.precioMensual.toFixed(2)}€/mes`, desc: 'Cuota mensual' },
+                { id: 'libre', label: 'Pago único', precio: `${seleccionado.precioLibre}€`, desc: 'Sin cuotas' },
+                { id: 'rtr', label: 'Rent-to-rent', precio: `${(seleccionado.precioMensual * 0.7).toFixed(2)}€/mes`, desc: 'Alquiler mensual' },
+              ] as const).map(m => (
                 <button
-                  key={m}
-                  onClick={() => setModalidad(m)}
-                  style={{ flex: 1, padding: '10px', border: `1.5px solid ${modalidad === m ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-md)', background: modalidad === m ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', cursor: 'pointer', textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-                    {m === 'mensual' ? `Financiado ${seleccionado.mesesFinanciacion} meses` : 'Pago único'}
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: modalidad === m ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>
-                    {m === 'mensual' ? `${seleccionado.precioMensual.toFixed(2)}€/mes` : `${seleccionado.precioLibre}€`}
-                  </div>
+                  key={m.id}
+                  onClick={() => setModalidadDetalle(m.id)}
+                  style={{ flex: 1, padding: '10px 6px', border: `1.5px solid ${modalidadDetalle === m.id ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-md)', background: modalidadDetalle === m.id ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', cursor: 'pointer', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 3 }}>{m.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)', color: modalidadDetalle === m.id ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{m.precio}</div>
+                  <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{m.desc}</div>
                 </button>
               ))}
             </div>
+            {modalidadDetalle === 'rtr' && (
+              <div className="fade-in" style={{ marginBottom: 12, padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-purple-light)', border: '1px solid var(--color-purple-border)', fontSize: 11, color: 'var(--color-purple)' }}>
+                Modalidad rent-to-rent: el dispositivo vuelve al operador al finalizar el contrato. Sin compromiso de compra.
+              </div>
+            )}
 
             {seleccionado.ahorro && (
               <div className="alert alert-ok" style={{ marginBottom: 14 }}>
@@ -279,13 +299,37 @@ export function DispositivosPage() {
               </div>
             )}
 
+            {/* Venta consciente */}
+            {mostrarVentaConsciente && (
+              <div className="fade-in" style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-green-dark)', marginBottom: 6 }}>✓ Resumen venta consciente</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-green-dark)', marginBottom: 3 }}>
+                  <span>Cuota actual parque</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{clienteActivo.productos.reduce((a, p) => a + (p.precio || 0), 0).toFixed(2)}€/mes</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-green-dark)', marginBottom: 3 }}>
+                  <span>+ {seleccionado.marca} {seleccionado.modelo}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>+{seleccionado.precioMensual.toFixed(2)}€/mes</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)', borderTop: '1px solid var(--color-green-border)', paddingTop: 6, marginTop: 6 }}>
+                  <span>Nueva cuota total</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{((clienteActivo.productos.reduce((a, p) => a + (p.precio || 0), 0) + seleccionado.precioMensual) * 1.21).toFixed(2)}€/mes</span>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setSeleccionado(null)} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>
                 Cancelar
               </button>
-              <button onClick={() => addCesta(seleccionado)} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
-                + Añadir a la cesta
-              </button>
+              {!mostrarVentaConsciente ? (
+                <button onClick={() => setMostrarVentaConsciente(true)} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
+                  Ver resumen →
+                </button>
+              ) : (
+                <button onClick={() => { addCesta(seleccionado); setMostrarVentaConsciente(false) }} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
+                  ✓ Confirmar y añadir a cesta
+                </button>
+              )}
             </div>
           </div>
         </div>

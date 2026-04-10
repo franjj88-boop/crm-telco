@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { catalogoBundles, catalogoAddonsTV, catalogoDispositivos, buscarBundles } from '../../data/mockData'
 import type { Bundle, ResultadoBusquedaBundle, Dispositivo } from '../../types'
 
-type Paso = 1 | 2 | 3 | 4 | 5 | 6
+type Paso = 1 | 2 | 3 | 4 | 5
 type TipoAlta = 'movil' | 'convergente' | null
 
 type DatosCobertura = {
@@ -18,7 +18,6 @@ type DatosCliente = {
 type DatosProvision = {
   citaFecha: string; citaFranja: string
   sim: 'fisica' | 'esim'
-  fttr: 'no' | 'con-instalacion'
   entrega: 'domicilio' | 'tienda'
 }
 
@@ -36,21 +35,34 @@ const validarEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 const validarIBAN = (v: string) => v.replace(/\s/g, '').length >= 20
 const validarTel = (v: string) => /^[0-9]{9}$/.test(v.replace(/\s/g, ''))
 
-// ── MARCAS únicas del catálogo ──
 const marcasDisponibles = [...new Set(catalogoDispositivos.map(d => d.marca))].sort()
 const categoriasDisponibles = [...new Set(catalogoDispositivos.map(d => d.categoria))]
 
-export function NuevaVentaPage() {
-  const navigate = useNavigate()
-  const [paso, setPaso] = useState<Paso>(1)
-  const [tipoAlta, setTipoAlta] = useState<TipoAlta>(null)
+// Colores corporativos
+const BLUE = '#0033A0'
+const BLUE_LIGHT = '#EEF2FF'
+const BLUE_BORDER = '#C7D2FE'
 
-  // ── COBERTURA ──
+type NuevaVentaProps = {
+  tipoForzado?: 'movil' | 'convergente'
+  clientePreCargado?: {
+    dni: string; nombre: string; apellidos: string
+    email: string; telefono: string; iban?: string
+    scoringOK?: boolean
+  }
+}
+
+export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaProps = {}) {
+  const navigate = useNavigate()
+  const [paso, setPaso] = useState<Paso>(tipoForzado ? 2 : 1)
+  const [tipoAlta, setTipoAlta] = useState<TipoAlta>(tipoForzado || null)
+
+  // Cobertura
   const [cob, setCob] = useState<DatosCobertura>({ calle: '', numero: '', cp: '', ciudad: '', tecnologia: null, velocidadMax: 0, autoinstalable: false, verificada: false })
   const [verificando, setVerificando] = useState(false)
   const [sinCob, setSinCob] = useState(false)
 
-  // ── CONFIGURADOR ──
+  // Configurador paso 2
   const [fibraSel, setFibraSel] = useState<number | null>(null)
   const [numLineas, setNumLineas] = useState(0)
   const [datosPpal, setDatosPpal] = useState<number | 'ilimitado' | null>(null)
@@ -60,9 +72,23 @@ export function NuevaVentaPage() {
   const [bundleSel, setBundleSel] = useState<Bundle | null>(null)
   const [addonsSel, setAddonsSel] = useState<Set<string>>(new Set())
   const [dispositivoSel, setDispositivoSel] = useState<Dispositivo | null>(null)
-
-  // ── MODAL ESCAPARATE ──
   const [modalAbierto, setModalAbierto] = useState(false)
+
+  // FTTR (movido a paso 2)
+  const [fttr, setFttr] = useState<'no' | 'con-instalacion'>('no')
+
+  // Portabilidad
+  const [portaLineas, setPortaLineas] = useState<'ninguna' | 'primera' | 'segunda' | 'ambas'>('ninguna')
+  const [numeroPorta1, setNumeroPorta1] = useState('')
+  const [operadorPorta1, setOperadorPorta1] = useState('')
+  const [numeroPorta2, setNumeroPorta2] = useState('')
+  const [operadorPorta2, setOperadorPorta2] = useState('')
+
+  // Señalización terceros
+  const [senalizaciones, setSenalizaciones] = useState<string[]>([])
+  const [mostrarTerceros, setMostrarTerceros] = useState(false)
+
+  // Filtros escaparate
   const [filtroPrecioMin, setFiltroPrecioMin] = useState(0)
   const [filtroPrecioMax, setFiltroPrecioMax] = useState(2000)
   const [filtroMarcas, setFiltroMarcas] = useState<Set<string>>(new Set())
@@ -71,28 +97,35 @@ export function NuevaVentaPage() {
   const [mostrarMas, setMostrarMas] = useState(false)
   const hayFiltros = filtroMarcas.size > 0 || filtroCategoria !== 'todas' || filtroPrecioMin > 0 || filtroPrecioMax < 2000
 
-  // ── DATOS CLIENTE ──
-  const [datos, setDatos] = useState<DatosCliente>({ dni: '', nombre: '', apellidos: '', email: '', telefono: '', iban: '', nacionalidad: 'Española', idioma: 'Castellano' })
-  const [scoring, setScoring] = useState<boolean | null>(null)
+  // Datos cliente paso 3
+  const [datos, setDatos] = useState<DatosCliente>({
+    dni: clientePreCargado?.dni || '',
+    nombre: clientePreCargado?.nombre || '',
+    apellidos: clientePreCargado?.apellidos || '',
+    email: clientePreCargado?.email || '',
+    telefono: clientePreCargado?.telefono || '',
+    iban: clientePreCargado?.iban || '',
+    nacionalidad: 'Española',
+    idioma: 'Castellano'
+  })
+  const [scoring, setScoring] = useState<boolean | null>(clientePreCargado?.scoringOK ? true : null)
   const [scoringCargando, setScoringCargando] = useState(false)
 
-  // ── PROVISIÓN ──
-  const [prov, setProv] = useState<DatosProvision>({ citaFecha: '', citaFranja: '', sim: 'fisica', fttr: 'no', entrega: 'domicilio' })
+  // Provisión paso 4
+  const [prov, setProv] = useState<DatosProvision>({ citaFecha: '', citaFranja: '', sim: 'fisica', entrega: 'domicilio' })
 
-  // ── FIRMA ──
+  // Firma paso 5
   const [firmando, setFirmando] = useState(false)
   const [firmado, setFirmado] = useState(false)
 
-  // ── PRECIOS ──
+  // Precios
   const precioBundle = bundleSel?.precio || 0
   const precioAddons = catalogoAddonsTV.filter(a => addonsSel.has(a.id)).reduce((s, a) => s + a.precio, 0)
-  const precioDispositivo = dispositivoSel ? dispositivoSel.precioMensual : 0
-  const precioFttr = prov.fttr === 'con-instalacion' ? 12 : 0
+  const precioFttr = fttr === 'con-instalacion' ? 12 : 0
   const precioTotal = precioBundle + precioAddons + precioFttr
   const precioConIVA = precioTotal * 1.21
   const cuotaDisp = dispositivoSel?.precioMensual || 0
 
-  // ── HELPERS ──
   const tieneLinea = bundleSel && bundleSel.categoria !== 'fibra_sola'
   const esSoloMovil = tipoAlta === 'movil'
 
@@ -103,7 +136,6 @@ export function NuevaVentaPage() {
     const s = new Set(filtroMarcas); s.has(m) ? s.delete(m) : s.add(m); setFiltroMarcas(s)
   }
 
-  // ── DISPOSITIVOS FILTRADOS ──
   const dispositivosFiltrados = useMemo(() => {
     let lista = [...catalogoDispositivos]
     if (filtroMarcas.size > 0) lista = lista.filter(d => filtroMarcas.has(d.marca))
@@ -118,7 +150,6 @@ export function NuevaVentaPage() {
   const dispositivosMostrados = hayFiltros || mostrarMas ? dispositivosFiltrados.slice(0, 20) : dispositivosFiltrados.slice(0, 10)
   const hayMas = !hayFiltros && !mostrarMas && dispositivosFiltrados.length > 10
 
-  // ── VERIFICAR COBERTURA ──
   const verificarCobertura = () => {
     if (!cob.calle || !cob.numero || !cob.cp || !cob.ciudad) return
     setVerificando(true); setSinCob(false)
@@ -131,119 +162,201 @@ export function NuevaVentaPage() {
     }, 1800)
   }
 
-  // ── BUSCAR BUNDLES ──
   const buscar = () => {
     const fibra = esSoloMovil ? null : fibraSel
     const res = buscarBundles(fibra, numLineas, datosPpal, datosSec)
     setResultados(res); setBuscado(true); setBundleSel(null)
   }
 
-  // ── SCORING ──
   const ejecutarScoring = () => {
     if (!validarDNI(datos.dni)) return
     setScoringCargando(true); setScoring(null)
     setTimeout(() => { setScoring(!datos.dni.startsWith('0')); setScoringCargando(false) }, 1800)
   }
 
-  // ── VALIDACIONES ──
   const paso1OK = tipoAlta !== null
-  const paso2OK = esSoloMovil ? true : cob.verificada
-  const paso3OK = !!bundleSel
-  const paso4OK = validarDNI(datos.dni) && datos.nombre.trim().length > 1 && datos.apellidos.trim().length > 1 && validarEmail(datos.email) && validarTel(datos.telefono) && validarIBAN(datos.iban) && scoring === true
-  const paso5OK = cob.autoinstalable || esSoloMovil || (prov.citaFecha !== '' && prov.citaFranja !== '')
+  const paso2OK = !!bundleSel
+  const paso3OK = validarDNI(datos.dni) && datos.nombre.trim().length > 1 && datos.apellidos.trim().length > 1 && validarEmail(datos.email) && validarTel(datos.telefono) && validarIBAN(datos.iban) && scoring === true
+  const paso4OK = esSoloMovil || cob.autoinstalable || (prov.citaFecha !== '' && prov.citaFranja !== '')
 
   const avanzar = () => {
     if (paso === 1) {
-      if (esSoloMovil) { setNumLineas(1); setPaso(3) }
+      if (esSoloMovil) { setNumLineas(1); setPaso(2) }
       else setPaso(2)
-    } else if (paso === 2) setPaso(3)
-    else if (paso < 6) setPaso((paso + 1) as Paso)
+    } else if (paso < 5) setPaso((paso + 1) as Paso)
   }
   const retroceder = () => {
-    if (paso === 3 && esSoloMovil) setPaso(1)
-    else if (paso > 1) setPaso((paso - 1) as Paso)
+    if (paso === 2 && tipoForzado) return // no puede volver al paso 1 si el tipo está forzado
+    if (paso > 1) setPaso((paso - 1) as Paso)
   }
 
-  const pasosMostrados = esSoloMovil
-    ? [{ num: 1, label: 'Tipo alta' }, { num: 3, label: 'Tarifa' }, { num: 4, label: 'Cliente' }, { num: 5, label: 'Provisión' }, { num: 6, label: 'Firma' }]
-    : [{ num: 1, label: 'Tipo alta' }, { num: 2, label: 'Cobertura' }, { num: 3, label: 'Tarifa' }, { num: 4, label: 'Cliente' }, { num: 5, label: 'Provisión' }, { num: 6, label: 'Firma' }]
-
-  const pasoActualIdx = pasosMostrados.findIndex(p => p.num === paso)
+  const pasosMostrados = [
+    { num: 1, label: 'Tipo de alta' },
+    { num: 2, label: 'Producto' },
+    { num: 3, label: 'Tus datos' },
+    { num: 4, label: 'Instalación' },
+    { num: 5, label: 'Firma' },
+  ]
 
   const matchColor = (tipo: string) => ({
-    exacto: { bg: 'var(--color-green-light)', border: 'var(--color-green-border)', color: 'var(--color-green-dark)', label: '✓ Exacto' },
-    aproximado: { bg: 'var(--color-blue-light)', border: 'var(--color-blue-mid)', color: 'var(--color-blue-dark)', label: '≈ Aproximado' },
-    parcial: { bg: 'var(--color-amber-light)', border: 'var(--color-amber-border)', color: 'var(--color-amber-dark)', label: '~ Parcial' },
+    exacto: { bg: '#F0FDF4', border: '#86EFAC', color: '#166534', label: '✓ Match exacto' },
+    aproximado: { bg: BLUE_LIGHT, border: BLUE_BORDER, color: BLUE, label: '≈ Aproximado' },
+    parcial: { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', label: '~ Parcial' },
   }[tipo] || { bg: '', border: '', color: '', label: '' })
 
-  // ── LAYOUT ──
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-background-secondary)', overflowY: 'auto' }}>
+  // Panel resumen lateral
+  const ResumenLateral = ({ mostrarFirma = false }: { mostrarFirma?: boolean }) => (
+    <div style={{ position: 'sticky', top: 80 }}>
+      <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#111827' }}>Resumen del pedido</div>
 
-      {/* ── HEADER FIJO ── */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'var(--color-background-primary)', borderBottom: '1px solid var(--color-border-tertiary)', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => navigate('/')} className="btn-secondary" style={{ fontSize: 11, height: 28 }}>← Salir</button>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>Alta de nuevo cliente</div>
-            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
-              {tipoAlta === 'movil' ? 'Solo línea móvil' : tipoAlta === 'convergente' ? 'Fibra + móvil (convergente)' : 'Nueva contratación'}
-            </div>
+        {!bundleSel ? (
+          <div style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>📦</div>
+            Selecciona un bundle
           </div>
+        ) : (
+          <>
+            <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: 14, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 13, color: '#374151', flex: 1, marginRight: 8 }}>{bundleSel.nombre}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#111827', flexShrink: 0 }}>{bundleSel.precio.toFixed(0)}€/mes</span>
+              </div>
+              {catalogoAddonsTV.filter(a => addonsSel.has(a.id)).map(a => (
+                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: '#6B7280' }}>{a.nombre}</span>
+                  <span style={{ fontSize: 13 }}>{a.precio}€/mes</span>
+                </div>
+              ))}
+              {fttr === 'con-instalacion' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: '#6B7280' }}>FTTR — Fiber to the Room</span>
+                  <span style={{ fontSize: 13 }}>+12€/mes</span>
+                </div>
+              )}
+              {dispositivoSel && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: '#6B7280' }}>{dispositivoSel.marca} {dispositivoSel.modelo}</span>
+                  <span style={{ fontSize: 13 }}>+{cuotaDisp.toFixed(2)}€/mes</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Cuota mensual:</span>
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#111827' }}>{(precioConIVA + cuotaDisp * 1.21).toFixed(0)}€/mes</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: mostrarFirma ? 16 : 0 }}>Todos los precios con IVA incluido</div>
+
+            {mostrarFirma && (
+              <>
+                <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginBottom: 14 }}>
+                    <input type="checkbox" style={{ marginTop: 2, accentColor: BLUE }} checked={firmando} onChange={e => setFirmando(e.target.checked)} />
+                    <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
+                      He leído y <span style={{ color: BLUE, textDecoration: 'underline', cursor: 'pointer' }}>acepto las condiciones generales, particulares y de desistimiento</span>
+                    </span>
+                  </label>
+                  <button
+                    onClick={() => { if (firmando) setTimeout(() => setFirmado(true), 1500) }}
+                    disabled={!firmando}
+                    style={{ width: '100%', padding: '14px', background: firmando ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: firmando ? 'pointer' : 'not-allowed', transition: 'background 0.2s' }}>
+                    🔐 Confirmar pedido con OTP
+                  </button>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 10, lineHeight: 1.5 }}>
+                    Te llamaremos en los próximos días para concertar una cita para la instalación o solicitarte información adicional.
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
+
+      {/* HEADER FIJO */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ← Salir
+          </button>
+          <div style={{ width: 1, height: 18, background: '#E5E7EB' }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
+            {tipoForzado === 'convergente' ? 'Alta de servicio — BAF / BAF Convergente' : tipoForzado === 'movil' ? 'Alta línea Móvil' : 'Alta de nuevo cliente'}
+          </span>
         </div>
 
         {/* Stepper */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           {pasosMostrados.map((p, i) => {
             const activo = p.num === paso
-            const completado = pasoActualIdx > i
+            const completado = paso > p.num
             return (
               <div key={p.num} style={{ display: 'flex', alignItems: 'center' }}>
-                {i > 0 && <div style={{ width: 24, height: 2, background: completado ? 'var(--color-green-border)' : 'var(--color-border-secondary)' }} />}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 'var(--border-radius-full)', background: activo ? 'var(--color-blue-light)' : 'transparent' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: completado ? 'var(--color-green-border)' : activo ? 'var(--color-blue)' : 'var(--color-background-secondary)', color: (completado || activo) ? '#fff' : 'var(--color-text-tertiary)', border: (!completado && !activo) ? '1px solid var(--color-border-secondary)' : 'none', flexShrink: 0 }}>
-                    {completado ? '✓' : i + 1}
+                {i > 0 && <div style={{ width: 28, height: 2, background: completado ? BLUE : '#E5E7EB' }} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: activo ? BLUE_LIGHT : 'transparent' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: completado ? BLUE : activo ? BLUE : '#F3F4F6', color: (completado || activo) ? 'white' : '#9CA3AF', border: (!completado && !activo) ? '1.5px solid #D1D5DB' : 'none', flexShrink: 0 }}>
+                    {completado ? '✓' : p.num}
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: activo ? 600 : 400, color: activo ? 'var(--color-blue-dark)' : completado ? 'var(--color-green)' : 'var(--color-text-tertiary)' }}>{p.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: activo ? 600 : 400, color: activo ? BLUE : completado ? BLUE : '#9CA3AF', whiteSpace: 'nowrap' }}>{p.label}</span>
                 </div>
               </div>
             )
           })}
         </div>
 
-        {/* Cesta mini */}
         {bundleSel && (
-          <div style={{ fontSize: 11, padding: '4px 12px', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', borderRadius: 'var(--border-radius-full)', color: 'var(--color-blue-dark)', fontWeight: 600 }}>
-            {bundleSel.nombre} · {precioConIVA.toFixed(2)}€/mes
-            {dispositivoSel && ` + ${dispositivoSel.marca} ${dispositivoSel.modelo}`}
+          <div style={{ fontSize: 12, padding: '6px 14px', background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 20, color: BLUE, fontWeight: 600 }}>
+            {bundleSel.nombre} · {(precioConIVA).toFixed(0)}€/mes
           </div>
         )}
       </div>
 
-      <div style={{ padding: 20 }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
 
-        {/* ══════════════════════════════════════
-            PASO 1 — TIPO DE ALTA
-        ══════════════════════════════════════ */}
+        {/* ══════════ PASO 1 — TIPO DE ALTA ══════════ */}
         {paso === 1 && (
-          <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>¿Qué quiere contratar el cliente?</div>
+          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#111827', marginBottom: 8 }}>¿Qué quiere contratar el cliente?</div>
+              <div style={{ fontSize: 14, color: '#6B7280' }}>Selecciona el tipo de alta para comenzar</div>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               {[
-                { val: 'movil' as TipoAlta, icono: '📱', titulo: 'Solo línea móvil', desc: 'Alta de una o varias líneas móviles sin fibra. No requiere verificación de cobertura.', color: 'var(--color-purple)', bg: 'var(--color-purple-light)', border: 'var(--color-purple-border)' },
-                { val: 'convergente' as TipoAlta, icono: '🏠', titulo: 'Convergente', desc: 'Fibra + líneas móviles. Se verifica cobertura en la dirección de instalación.', color: 'var(--color-blue)', bg: 'var(--color-blue-light)', border: 'var(--color-blue-mid)' },
+                {
+                  val: 'movil' as TipoAlta,
+                  icono: '📱',
+                  titulo: 'Alta línea Móvil',
+                  desc: 'Alta de una o varias líneas móviles sin fibra. No requiere verificación de cobertura.',
+                  color: '#7C3AED',
+                  bg: '#F5F3FF',
+                  border: '#DDD6FE',
+                  borderActive: '#7C3AED',
+                },
+                {
+                  val: 'convergente' as TipoAlta,
+                  icono: '🏠',
+                  titulo: 'BAF / BAF Convergente',
+                  desc: 'Fibra + líneas móviles. Se verifica cobertura en la dirección de instalación.',
+                  color: BLUE,
+                  bg: BLUE_LIGHT,
+                  border: BLUE_BORDER,
+                  borderActive: BLUE,
+                },
               ].map(op => (
                 <div key={op.val!} onClick={() => setTipoAlta(op.val)}
-                  style={{ padding: '24px 20px', border: `2px solid ${tipoAlta === op.val ? op.border : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: tipoAlta === op.val ? op.bg : 'var(--color-background-primary)', transition: 'all 0.15s', boxShadow: tipoAlta === op.val ? 'var(--shadow-md)' : 'var(--shadow-sm)' }}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = tipoAlta === op.val ? 'var(--shadow-md)' : 'var(--shadow-sm)'}
-                >
-                  <div style={{ fontSize: 36, marginBottom: 12 }}>{op.icono}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: tipoAlta === op.val ? op.color : 'var(--color-text-primary)', marginBottom: 8 }}>{op.titulo}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{op.desc}</div>
+                  style={{ padding: '28px 24px', border: `2px solid ${tipoAlta === op.val ? op.borderActive : '#E5E7EB'}`, borderRadius: 12, cursor: 'pointer', background: tipoAlta === op.val ? op.bg : 'white', transition: 'all 0.15s', boxShadow: tipoAlta === op.val ? `0 0 0 4px ${op.bg}` : '0 1px 4px rgba(0,0,0,0.06)' }}
+                  onMouseEnter={e => { if (tipoAlta !== op.val) e.currentTarget.style.borderColor = op.border }}
+                  onMouseLeave={e => { if (tipoAlta !== op.val) e.currentTarget.style.borderColor = '#E5E7EB' }}>
+                  <div style={{ fontSize: 40, marginBottom: 14 }}>{op.icono}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: tipoAlta === op.val ? op.color : '#111827', marginBottom: 8 }}>{op.titulo}</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>{op.desc}</div>
                   {tipoAlta === op.val && (
-                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: op.color }}>
+                    <div style={{ marginTop: 12, fontSize: 12, fontWeight: 600, color: op.color, display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span>✓</span> Seleccionado
                     </div>
                   )}
@@ -252,217 +365,201 @@ export function NuevaVentaPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={avanzar} disabled={!paso1OK} className="btn-primary" style={{ fontSize: 12, height: 36 }}>
+              <button onClick={avanzar} disabled={!paso1OK}
+                style={{ padding: '12px 32px', background: paso1OK ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: paso1OK ? 'pointer' : 'not-allowed' }}>
                 Continuar →
               </button>
             </div>
           </div>
         )}
 
-        {/* ══════════════════════════════════════
-            PASO 2 — COBERTURA (solo convergente)
-        ══════════════════════════════════════ */}
+        {/* ══════════ PASO 2 — PRODUCTO ══════════ */}
         {paso === 2 && (
-          <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="card">
-              <div className="card-title">Verificación de cobertura</div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
-                Introduce la dirección de instalación para verificar la cobertura disponible antes de configurar la tarifa.
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 8, marginBottom: 8 }}>
-                <input className="input" placeholder="Calle / avenida / plaza..." value={cob.calle} onChange={e => setCob(p => ({ ...p, calle: e.target.value, verificada: false }))} />
-                <input className="input" placeholder="Nº" value={cob.numero} onChange={e => setCob(p => ({ ...p, numero: e.target.value, verificada: false }))} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 8, marginBottom: 16 }}>
-                <input className="input" placeholder="Código postal" value={cob.cp} onChange={e => setCob(p => ({ ...p, cp: e.target.value, verificada: false }))} />
-                <input className="input" placeholder="Ciudad / municipio" value={cob.ciudad} onChange={e => setCob(p => ({ ...p, ciudad: e.target.value, verificada: false }))} />
-              </div>
+              {/* Cobertura — solo convergente */}
+              {!esSoloMovil && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Verificación de cobertura</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Introduce la dirección de instalación para verificar la cobertura disponible.</div>
 
-              <button onClick={verificarCobertura} disabled={verificando || !cob.calle || !cob.numero || !cob.cp || !cob.ciudad} className="btn-primary" style={{ width: '100%', justifyContent: 'center', height: 38 }}>
-                {verificando ? <><span className="spinner spinner-sm" /> Verificando cobertura...</> : '📡 Verificar cobertura'}
-              </button>
-
-              {sinCob && (
-                <div className="alert alert-err" style={{ marginTop: 12 }}>
-                  <span>✕</span>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>Sin cobertura disponible</div>
-                    <div style={{ fontSize: 11, marginTop: 2 }}>No hay cobertura en esta dirección. Puedes registrar un prepedido.</div>
-                  </div>
-                </div>
-              )}
-
-              {cob.verificada && (
-                <div className="alert alert-ok fade-in" style={{ marginTop: 12 }}>
-                  <span>✓</span>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>Fibra óptica disponible</div>
-                    <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                      <span>📍 {cob.calle} {cob.numero}, {cob.cp} {cob.ciudad}</span>
-                      <span>🚀 Hasta {cob.velocidadMax === 1000 ? '1 Gb' : `${cob.velocidadMax} Mb`}</span>
-                      <span>👷 Requiere técnico</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 10, textAlign: 'center' }}>
-                Simulación: CPs que empiecen por 28, 08, 41, 46 o 48 → Fibra · Resto → Fibra 600Mb · CP 00000 → Sin cobertura
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button onClick={retroceder} className="btn-secondary" style={{ fontSize: 11 }}>← Atrás</button>
-              <button onClick={avanzar} disabled={!paso2OK} className="btn-primary" style={{ fontSize: 12, height: 36 }}>
-                Continuar → Configurar tarifa
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════
-            PASO 3 — CONFIGURADOR + DISPOSITIVO
-        ══════════════════════════════════════ */}
-        {paso === 3 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, maxWidth: 1100, margin: '0 auto' }}>
-
-            {/* COLUMNA IZQUIERDA */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-              {/* Info cobertura */}
-              {!esSoloMovil && cob.verificada && (
-                <div style={{ padding: '8px 14px', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)', borderRadius: 'var(--border-radius-md)', fontSize: 11, color: 'var(--color-green-dark)', display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span>✓</span>
-                  <span><strong>{cob.calle} {cob.numero}, {cob.cp} {cob.ciudad}</strong> · Fibra hasta {cob.velocidadMax === 1000 ? '1 Gb' : `${cob.velocidadMax} Mb`}</span>
-                </div>
-              )}
-
-              {/* TILES INGREDIENTES */}
-              <div className="card">
-                <div className="card-title">Configura la tarifa</div>
-
-                {/* Fibra — solo convergente */}
-                {!esSoloMovil && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>🌐 Velocidad de fibra</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {[300, 600, 1000].map(f => {
-                        const label = f === 1000 ? '1 Gb' : `${f} Mb`
-                        const activo = fibraSel === f
-                        const disabled = f > (cob.velocidadMax || 1000)
-                        return (
-                          <div key={f} onClick={() => !disabled && setFibraSel(f)}
-                            style={{ flex: 1, padding: '12px 8px', border: `2px solid ${activo ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: disabled ? 'not-allowed' : 'pointer', background: activo ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', opacity: disabled ? 0.4 : 1, textAlign: 'center', transition: 'all 0.1s' }}>
-                            <div style={{ fontSize: 18, marginBottom: 4 }}>📡</div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: activo ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{label}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Líneas */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>📱 Líneas móviles</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {(esSoloMovil ? [1, 2, 3] : [0, 1, 2, 3]).map(n => {
-                      const activo = numLineas === n
-                      return (
-                        <div key={n} onClick={() => { setNumLineas(n); if (n === 0) { setDatosPpal(null); setDatosSec(null) } }}
-                          style={{ flex: 1, padding: '12px 8px', border: `2px solid ${activo ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: activo ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', textAlign: 'center', transition: 'all 0.1s' }}>
-                          <div style={{ fontSize: 18, marginBottom: 4 }}>{n === 0 ? '—' : '📱'.repeat(Math.min(n, 2))}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: activo ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{n === 0 ? 'Sin línea' : `${n} línea${n > 1 ? 's' : ''}`}</div>
+                  {!cob.verificada ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 10 }}>
+                        <input className="input" placeholder="Calle / avenida / plaza..." value={cob.calle} onChange={e => setCob(p => ({ ...p, calle: e.target.value, verificada: false }))} style={{ height: 44 }} />
+                        <input className="input" placeholder="Nº" value={cob.numero} onChange={e => setCob(p => ({ ...p, numero: e.target.value, verificada: false }))} style={{ height: 44 }} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, marginBottom: 16 }}>
+                        <input className="input" placeholder="Código postal" value={cob.cp} onChange={e => setCob(p => ({ ...p, cp: e.target.value, verificada: false }))} style={{ height: 44 }} />
+                        <input className="input" placeholder="Ciudad" value={cob.ciudad} onChange={e => setCob(p => ({ ...p, ciudad: e.target.value, verificada: false }))} style={{ height: 44 }} />
+                      </div>
+                      <button onClick={verificarCobertura} disabled={verificando || !cob.calle || !cob.numero || !cob.cp || !cob.ciudad}
+                        style={{ padding: '10px 24px', background: BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!cob.calle || !cob.numero || !cob.cp || !cob.ciudad || verificando) ? 0.6 : 1 }}>
+                        {verificando ? '⏳ Verificando cobertura...' : '📡 Verificar cobertura'}
+                      </button>
+                      {sinCob && (
+                        <div style={{ marginTop: 12, padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#991B1B' }}>
+                          ✕ Sin cobertura en esta dirección. Puedes registrar un prepedido.
                         </div>
-                      )
-                    })}
-                  </div>
+                      )}
+                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 10 }}>
+                        Simulación: CPs 28x, 08x, 41x, 46x, 48x → Fibra · Resto → Fibra 600Mb · CP 00000 → Sin cobertura
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8 }}>
+                      <span style={{ fontSize: 13, color: '#166534' }}>
+                        ✓ <strong>{cob.calle} {cob.numero}, {cob.cp} {cob.ciudad}</strong> · Fibra hasta {cob.velocidadMax === 1000 ? '1 Gb' : `${cob.velocidadMax} Mb`}
+                      </span>
+                      <button onClick={() => setCob(p => ({ ...p, verificada: false }))} style={{ fontSize: 12, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                        Modificar
+                      </button>
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {/* Datos línea principal */}
-                {numLineas >= 1 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>📶 Datos línea {numLineas > 1 ? 'principal' : ''}</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {([20, 30, 'ilimitado'] as (number | 'ilimitado')[]).map(d => {
-                        const activo = datosPpal === d
-                        const label = d === 'ilimitado' ? 'Ilimitado' : `${d} GB`
-                        return (
-                          <div key={String(d)} onClick={() => setDatosPpal(d)}
-                            style={{ flex: 1, padding: '12px 8px', border: `2px solid ${activo ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: activo ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', textAlign: 'center', transition: 'all 0.1s' }}>
-                            <div style={{ fontSize: 16, marginBottom: 4 }}>📶</div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: activo ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{label}</div>
-                          </div>
-                        )
-                      })}
+              {/* Configurador tarifa */}
+              {(esSoloMovil || cob.verificada) && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 20 }}>Configura la tarifa</div>
+
+                  {/* Fibra */}
+                  {!esSoloMovil && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>🌐 Velocidad de fibra</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[300, 600, 1000].filter(f => f <= (cob.velocidadMax || 1000)).map(f => (
+                          <button key={f} onClick={() => setFibraSel(f)}
+                            style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, border: `2px solid ${fibraSel === f ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: 'white', color: fibraSel === f ? BLUE : '#374151', transition: 'all 0.1s' }}>
+                            {f === 1000 ? '1 Gb' : `${f} Mb`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Líneas */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>📱 Líneas móviles</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {(esSoloMovil ? [1, 2, 3] : [0, 1, 2, 3]).map(n => (
+                        <button key={n} onClick={() => { setNumLineas(n); if (n === 0) { setDatosPpal(null); setDatosSec(null) } }}
+                          style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, border: `2px solid ${numLineas === n ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: 'white', color: numLineas === n ? BLUE : '#374151' }}>
+                          {n === 0 ? 'Sin línea' : `${n} línea${n > 1 ? 's' : ''}`}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                )}
 
-                {/* Datos 2ª línea */}
-                {numLineas >= 2 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>📶 Datos 2ª línea</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {([20, 30, 'ilimitado'] as (number | 'ilimitado')[]).map(d => {
-                        const activo = datosSec === d
-                        const label = d === 'ilimitado' ? 'Ilimitado' : `${d} GB`
-                        return (
-                          <div key={String(d)} onClick={() => setDatosSec(d)}
-                            style={{ flex: 1, padding: '12px 8px', border: `2px solid ${activo ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: activo ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', textAlign: 'center', transition: 'all 0.1s' }}>
-                            <div style={{ fontSize: 16, marginBottom: 4 }}>📶</div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: activo ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{label}</div>
-                          </div>
-                        )
-                      })}
+                  {/* Datos línea principal */}
+                  {numLineas >= 1 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>📶 Datos línea {numLineas > 1 ? 'principal' : ''}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {([20, 30, 'ilimitado'] as (number | 'ilimitado')[]).map(d => (
+                          <button key={String(d)} onClick={() => setDatosPpal(d)}
+                            style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, border: `2px solid ${datosPpal === d ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: 'white', color: datosPpal === d ? BLUE : '#374151' }}>
+                            {d === 'ilimitado' ? 'Ilimitado' : `${d} GB`}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <button onClick={buscar} className="btn-primary" style={{ width: '100%', justifyContent: 'center', height: 38 }}>
-                  🔍 Buscar bundles compatibles
-                </button>
-              </div>
+                  {/* Datos 2ª línea */}
+                  {numLineas >= 2 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>📶 Datos 2ª línea</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {([20, 30, 'ilimitado'] as (number | 'ilimitado')[]).map(d => (
+                          <button key={String(d)} onClick={() => setDatosSec(d)}
+                            style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, border: `2px solid ${datosSec === d ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: 'white', color: datosSec === d ? BLUE : '#374151' }}>
+                            {d === 'ilimitado' ? 'Ilimitado' : `${d} GB`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {/* RESULTADOS */}
+                  <button onClick={buscar}
+                    style={{ padding: '12px 28px', background: BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                    🔍 Buscar bundles compatibles
+                  </button>
+                </div>
+              )}
+
+              {/* Resultados bundles con NBA */}
               {buscado && (
-                <div className="card">
-                  <div className="card-title">
-                    Bundles compatibles
-                    {resultados.length > 0 && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>{resultados.length} resultados</span>}
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+                      Bundles compatibles
+                      {resultados.length > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: '#9CA3AF', marginLeft: 8 }}>{resultados.length} resultados</span>}
+                    </div>
                   </div>
+
+                  {/* NBA propuesta destacada */}
+                  {resultados.length > 0 && (() => {
+                    const nba = resultados.find(r => r.matchTipo === 'exacto') || resultados[0]
+                    return (
+                      <div style={{ marginBottom: 16, padding: '14px 16px', background: BLUE_LIGHT, border: `1.5px solid ${BLUE_BORDER}`, borderRadius: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: BLUE, color: 'white', fontWeight: 700 }}>⭐ NBA Recomendado</span>
+                          <span style={{ fontSize: 12, color: '#374151' }}>Mejor opción para este cliente</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{nba.bundle.nombre}</div>
+                            <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                              {nba.diferencias.length === 0 ? 'Match perfecto con lo solicitado' : `Ajuste: ${nba.diferencias[0]}`}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic', marginTop: 4 }}>
+                              💬 "{nba.bundle.categoria.includes('convergente') ? 'Solución completa optimizada para este perfil' : 'Tarifa móvil ajustada al consumo del cliente'}"
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: BLUE }}>{(nba.bundle.precio * 1.21).toFixed(0)}€/mes</div>
+                            <button onClick={() => setBundleSel(nba.bundle)}
+                              style={{ marginTop: 6, padding: '6px 16px', background: BLUE, color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                              Seleccionar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
                   {resultados.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+                    <div style={{ textAlign: 'center', padding: '24px', color: '#9CA3AF', fontSize: 13 }}>
                       <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
                       Sin bundles para esta combinación. Ajusta los filtros.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {resultados.map(r => {
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                      {resultados.map((r, idx) => {
                         const mc = matchColor(r.matchTipo)
                         const sel = bundleSel?.id === r.bundle.id
+                        const letra = String.fromCharCode(65 + idx)
                         return (
                           <div key={r.bundle.id} onClick={() => setBundleSel(sel ? null : r.bundle)}
-                            style={{ padding: '12px 14px', border: `1.5px solid ${sel ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: sel ? 'var(--color-blue-light)' : 'var(--color-background-primary)', transition: 'all 0.1s' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                  <span style={{ fontSize: 13, fontWeight: 700 }}>{r.bundle.nombre}</span>
-                                  {r.bundle.tag && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'var(--color-purple-light)', color: 'var(--color-purple)', fontWeight: 700 }}>{r.bundle.tag}</span>}
-                                </div>
-                                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{r.bundle.descripcion}</div>
-                              </div>
-                              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{r.bundle.precio.toFixed(2)}€</div>
-                                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>/mes sin IVA</div>
-                              </div>
+                            style={{ padding: '16px', border: `2px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white', transition: 'all 0.1s', boxShadow: sel ? `0 0 0 3px ${BLUE_LIGHT}` : 'none' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: BLUE, marginBottom: 8 }}>OPCIÓN {letra}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 4 }}>{r.bundle.nombre}</div>
+                            <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10 }}>{r.bundle.descripcion}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                              <span style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>{(r.bundle.precio * 1.21).toFixed(0)}€</span>
+                              <span style={{ fontSize: 12, color: '#9CA3AF' }}>/mes</span>
                             </div>
-                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: mc.bg, border: `1px solid ${mc.border}`, color: mc.color, fontWeight: 600 }}>{mc.label}</span>
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: mc.bg, border: `1px solid ${mc.border}`, color: mc.color, fontWeight: 600 }}>{mc.label}</span>
                             {r.diferencias.length > 0 && (
-                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--color-border-tertiary)' }}>
-                                {r.diferencias.map((d, i) => <div key={i} style={{ fontSize: 11, color: 'var(--color-amber-dark)' }}>· {d}</div>)}
+                              <div style={{ marginTop: 8 }}>
+                                {r.diferencias.map((d, i) => <div key={i} style={{ fontSize: 11, color: '#92400E' }}>· {d}</div>)}
                               </div>
+                            )}
+                            {sel && (
+                              <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: BLUE }}>✓ Seleccionado</div>
                             )}
                           </div>
                         )
@@ -472,21 +569,27 @@ export function NuevaVentaPage() {
                 </div>
               )}
 
-              {/* ADD-ONS TV */}
+              {/* Add-ons TV */}
               {bundleSel && bundleSel.categoria !== 'fibra_sola' && (
-                <div className="card">
-                  <div className="card-title">📺 Add-ons de televisión (opcional)</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>📺 Televisión (opcional)</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Añade los canales que quiera el cliente</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {catalogoAddonsTV.map(a => {
                       const sel = addonsSel.has(a.id)
                       return (
                         <div key={a.id} onClick={() => toggleAddon(a.id)}
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', border: `1.5px solid ${sel ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-md)', cursor: 'pointer', background: sel ? 'var(--color-blue-light)' : 'transparent', transition: 'all 0.1s' }}>
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1.5px solid ${sel ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: sel ? BLUE_LIGHT : 'white', transition: 'all 0.1s' }}>
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: sel ? 600 : 400 }}>{a.nombre}</div>
-                            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{a.canales.slice(0, 3).join(' · ')}</div>
+                            <div style={{ fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? BLUE : '#111827' }}>{a.nombre}</div>
+                            <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{a.canales.slice(0, 3).join(' · ')}</div>
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>+{a.precio.toFixed(2)}€</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: sel ? BLUE : '#374151' }}>+{a.precio}€/mes</span>
+                            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? BLUE : '#D1D5DB'}`, background: sel ? BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {sel && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✓</span>}
+                            </div>
+                          </div>
                         </div>
                       )
                     })}
@@ -494,629 +597,608 @@ export function NuevaVentaPage() {
                 </div>
               )}
 
-              {/* DISPOSITIVO */}
-              <div className="card">
-                <div className="card-title">
-                  📱 Dispositivo (opcional)
-                  {dispositivoSel && (
-                    <button onClick={() => setDispositivoSel(null)} style={{ fontSize: 10, padding: '1px 7px', borderRadius: 'var(--border-radius-full)', border: '1px solid var(--color-red-border)', background: 'var(--color-red-light)', color: 'var(--color-red-dark)', cursor: 'pointer', fontWeight: 600 }}>
-                      Quitar
+              {/* Portabilidad */}
+              {bundleSel && numLineas >= 1 && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>↔ Portabilidad</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>¿El cliente quiere portar algún número de otro operador?</div>
+
+                  <div style={{ display: 'flex', gap: 8, marginBottom: portaLineas !== 'ninguna' ? 16 : 0, flexWrap: 'wrap' }}>
+                    {[
+                      { val: 'ninguna', label: 'Sin portabilidad' },
+                      { val: 'primera', label: numLineas === 1 ? 'Portar la línea' : 'Portar 1ª línea' },
+                      ...(numLineas >= 2 ? [
+                        { val: 'segunda', label: 'Portar 2ª línea' },
+                        { val: 'ambas', label: 'Portar ambas' },
+                      ] : []),
+                    ].map(op => (
+                      <button key={op.val} onClick={() => setPortaLineas(op.val as any)}
+                        style={{ padding: '8px 18px', fontSize: 13, fontWeight: 600, border: `2px solid ${portaLineas === op.val ? BLUE : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', background: 'white', color: portaLineas === op.val ? BLUE : '#374151', transition: 'all 0.1s' }}>
+                        {op.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Campos porta línea 1 */}
+                  {(portaLineas === 'primera' || portaLineas === 'ambas') && (
+                    <div className="fade-in" style={{ marginBottom: 14, padding: '14px', background: '#F9FAFB', borderRadius: 8, border: '1px solid #E5E7EB' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                        {numLineas === 1 ? 'Datos de portabilidad' : 'Portabilidad — 1ª línea'}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>Número a portar</div>
+                          <input className="input" style={{ height: 40 }} placeholder="6XX XXX XXX"
+                            value={numeroPorta1} onChange={e => setNumeroPorta1(e.target.value)} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>Operador origen</div>
+                          <select className="input" style={{ height: 40 }} value={operadorPorta1} onChange={e => setOperadorPorta1(e.target.value)}>
+                            <option value="">— Seleccionar —</option>
+                            {['Vodafone', 'Orange', 'MásMóvil', 'Digi', 'Yoigo', 'Otro'].map(op => <option key={op}>{op}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      {operadorPorta1 && (
+                        <div style={{ marginTop: 8, padding: '6px 10px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 6, fontSize: 11, color: '#92400E', fontWeight: 600 }}>
+                          ⚠ Recuerda: ventana de portabilidad 10 días hábiles · Verificar SVIC antes de confirmar
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Campos porta línea 2 */}
+                  {(portaLineas === 'segunda' || portaLineas === 'ambas') && (
+                    <div className="fade-in" style={{ marginBottom: 14, padding: '14px', background: '#F9FAFB', borderRadius: 8, border: '1px solid #E5E7EB' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Portabilidad — 2ª línea</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>Número a portar</div>
+                          <input className="input" style={{ height: 40 }} placeholder="6XX XXX XXX"
+                            value={numeroPorta2} onChange={e => setNumeroPorta2(e.target.value)} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>Operador origen</div>
+                          <select className="input" style={{ height: 40 }} value={operadorPorta2} onChange={e => setOperadorPorta2(e.target.value)}>
+                            <option value="">— Seleccionar —</option>
+                            {['Vodafone', 'Orange', 'MásMóvil', 'Digi', 'Yoigo', 'Otro'].map(op => <option key={op}>{op}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* FTTR */}
+              {bundleSel && !esSoloMovil && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>🔧 FTTR — Fiber to the Room (opcional)</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Extiende la fibra óptica a cada habitación del hogar.</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {([
+                      ['no', '❌', 'Sin FTTR', '', ''],
+                      ['con-instalacion', '🔧', 'Con instalación', '+12€/mes durante 48 meses', 'Un técnico instala la fibra en cada habitación'],
+                    ] as const).map(([val, ico, tit, precio, desc]) => (
+                      <div key={val} onClick={() => setFttr(val)}
+                        style={{ padding: '16px', border: `2px solid ${fttr === val ? BLUE : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: fttr === val ? BLUE_LIGHT : 'white', textAlign: 'center', transition: 'all 0.1s' }}>
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>{ico}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: fttr === val ? BLUE : '#111827', marginBottom: 4 }}>{tit}</div>
+                        {precio && <div style={{ fontSize: 12, fontWeight: 600, color: BLUE, marginBottom: 4 }}>{precio}</div>}
+                        {desc && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{desc}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dispositivo */}
+              {bundleSel && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>📱 Dispositivo (opcional)</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Añade un terminal financiado o libre</div>
+                    </div>
+                    {dispositivoSel && (
+                      <button onClick={() => setDispositivoSel(null)} style={{ fontSize: 12, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  {dispositivoSel ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: BLUE_LIGHT, borderRadius: 8, border: `1.5px solid ${BLUE_BORDER}` }}>
+                      <div style={{ fontSize: 36 }}>{dispositivoSel.imagen}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{dispositivoSel.marca} {dispositivoSel.modelo}</div>
+                        <div style={{ fontSize: 12, color: '#4338CA', marginTop: 2 }}>
+                          {dispositivoSel.mesesFinanciacion} cuotas de {dispositivoSel.precioMensual.toFixed(2)}€/mes · {dispositivoSel.precioLibre}€ libre
+                        </div>
+                        {dispositivoSel.ahorro && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#166534', background: '#DCFCE7', padding: '2px 8px', borderRadius: 10, marginTop: 4, display: 'inline-block' }}>
+                            Ahorras {dispositivoSel.ahorro}€
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setModalAbierto(true)}
+                      style={{ padding: '10px 24px', border: `1.5px solid ${BLUE}`, borderRadius: 8, color: BLUE, background: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      📱 Ver escaparate de dispositivos →
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Productos de terceros */}
+              {bundleSel && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: mostrarTerceros ? 16 : 0 }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>🔗 Productos adicionales</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Alarmas, energía solar y otros servicios</div>
+                    </div>
+                    <button onClick={() => setMostrarTerceros(!mostrarTerceros)}
+                      style={{ fontSize: 13, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                      {mostrarTerceros ? '▲ Ocultar' : '▼ Ver productos'}
+                    </button>
+                  </div>
+                  {mostrarTerceros && (
+                    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[
+                        { id: 'seguro', icono: '🛡', nombre: 'Seguro móvil', desc: 'Rotura, robo y daños accidentales', precio: 5.99, contrat: true },
+                        { id: 'alarma', icono: '🔔', nombre: 'Alarma MPA', desc: 'Seguridad para el hogar', precio: 0, contrat: false },
+                        { id: 'solar', icono: '☀️', nombre: 'Solar 360 CT', desc: 'Energía solar para el hogar', precio: 0, contrat: false },
+                        { id: 'roaming', icono: '✈️', nombre: 'Bono Roaming Europa', desc: 'Datos en Europa sin coste adicional', precio: 3.90, contrat: true },
+                      ].map(p => {
+                        const sen = senalizaciones.includes(p.id)
+                        return (
+                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1.5px solid ${sen ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: 8, background: sen ? '#F0FDF4' : 'white' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={{ fontSize: 22 }}>{p.icono}</span>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{p.nombre}</div>
+                                <div style={{ fontSize: 12, color: '#9CA3AF' }}>{p.desc}</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {!p.contrat && (
+                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#FFFBEB', color: '#92400E', border: '1px solid #FCD34D', fontWeight: 700 }}>SEÑALIZABLE</span>
+                              )}
+                              {p.contrat && <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>+{p.precio}€/mes</span>}
+                              <button
+                                onClick={() => !p.contrat && setSenalizaciones(prev => prev.includes(p.id) ? prev.filter(s => s !== p.id) : [...prev, p.id])}
+                                style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, border: `1.5px solid ${sen ? '#16A34A' : p.contrat ? BLUE : '#F59E0B'}`, borderRadius: 6, background: sen ? '#16A34A' : 'white', color: sen ? 'white' : p.contrat ? BLUE : '#92400E', cursor: 'pointer' }}>
+                                {sen ? '✓ Señalizado' : p.contrat ? '+ Añadir' : 'Señalizar'}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {senalizaciones.length > 0 && (
+                        <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
+                          📋 Un especialista contactará al cliente para completar: <strong>{senalizaciones.join(', ')}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={retroceder} style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                  ← Atrás
+                </button>
+                <button onClick={avanzar} disabled={!paso2OK}
+                  style={{ padding: '12px 32px', background: paso2OK ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: paso2OK ? 'pointer' : 'not-allowed' }}>
+                  Continuar → Mis datos
+                </button>
+              </div>
+            </div>
+
+            <ResumenLateral />
+          </div>
+        )}
+
+        {/* ══════════ PASO 3 — DATOS CLIENTE ══════════ */}
+        {paso === 3 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 20 }}>Datos del cliente</div>
+
+                {/* DNI + Scoring */}
+                <div style={{ marginBottom: 20, padding: '16px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>DNI / NIE / Pasaporte *</div>
+                  <input className="input" placeholder="12345678A" value={datos.dni}
+                    onChange={e => { setDatos(p => ({ ...p, dni: e.target.value.toUpperCase() })); setScoring(null) }}
+                    style={{ marginBottom: 8, height: 44, borderColor: datos.dni && !validarDNI(datos.dni) ? '#EF4444' : undefined }}
+                  />
+                  {datos.dni && !validarDNI(datos.dni) && <div style={{ fontSize: 11, color: '#EF4444', marginBottom: 8 }}>Formato inválido — 8 dígitos + 1 letra</div>}
+                  {clientePreCargado?.scoringOK ? (
+                    <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534', fontWeight: 600 }}>
+                      ✓ Scoring OK — Cliente verificado previamente
+                    </div>
+                  ) : (
+                    <button onClick={ejecutarScoring} disabled={!validarDNI(datos.dni) || scoringCargando}
+                      style={{ width: '100%', padding: '10px', background: scoring === true ? '#16A34A' : scoring === false ? '#DC2626' : BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!validarDNI(datos.dni) || scoringCargando) ? 0.6 : 1 }}>
+                      {scoringCargando ? '⏳ Verificando scoring...' : scoring === true ? '✓ Scoring OK — Apto para contratar' : scoring === false ? '✕ Scoring KO — No apto' : '🔍 Ejecutar scoring de riesgo'}
                     </button>
                   )}
                 </div>
 
-                {dispositivoSel ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--color-blue-light)', borderRadius: 'var(--border-radius-md)', border: '1.5px solid var(--color-blue-mid)' }}>
-                    <div style={{ fontSize: 28 }}>{dispositivoSel.imagen}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-blue-dark)' }}>{dispositivoSel.marca} {dispositivoSel.modelo}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>{dispositivoSel.mesesFinanciacion} cuotas de {dispositivoSel.precioMensual.toFixed(2)}€/mes</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-blue-dark)' }}>{dispositivoSel.precioLibre}€</div>
-                      <div style={{ fontSize: 10, color: 'var(--color-blue-dark)' }}>precio libre</div>
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={() => setModalAbierto(true)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
-                    📱 Ver escaparate de dispositivos →
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* COLUMNA DERECHA — CESTA */}
-            <div>
-              <div className="card" style={{ position: 'sticky', top: 70 }}>
-                <div className="card-title">🛒 Resumen</div>
-
-                {!bundleSel ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>📦</div>
-                    Selecciona un bundle
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ padding: '8px 10px', background: 'var(--color-blue-light)', borderRadius: 'var(--border-radius-md)', marginBottom: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-blue-dark)', marginBottom: 3 }}>{bundleSel.nombre}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-blue-dark)' }}>
-                        <span>Bundle</span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{bundleSel.precio.toFixed(2)}€</span>
-                      </div>
-                    </div>
-
-                    {catalogoAddonsTV.filter(a => addonsSel.has(a.id)).map(a => (
-                      <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', padding: '2px 0' }}>
-                        <span>{a.nombre}</span><span style={{ fontFamily: 'var(--font-mono)' }}>+{a.precio.toFixed(2)}€</span>
-                      </div>
-                    ))}
-
-                    {dispositivoSel && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', padding: '4px 0', borderTop: '1px solid var(--color-border-tertiary)', marginTop: 4 }}>
-                        <span>{dispositivoSel.marca} {dispositivoSel.modelo}</span>
-                        <span style={{ fontFamily: 'var(--font-mono)' }}>+{cuotaDisp.toFixed(2)}€/mes</span>
+                {/* Formulario datos — solo si scoring OK */}
+                {scoring === true && (
+                  <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {clientePreCargado && (
+                      <div style={{ padding: '10px 14px', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 8, fontSize: 12, color: '#0033A0', fontWeight: 600 }}>
+                        ✓ Datos precargados del cliente — revisa y confirma antes de continuar
                       </div>
                     )}
-
-                    <div style={{ borderTop: '1px solid var(--color-border-secondary)', paddingTop: 8, marginTop: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 2 }}>
-                        <span>Sin IVA</span><span style={{ fontFamily: 'var(--font-mono)' }}>{precioTotal.toFixed(2)}€</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nombre *</div>
+                        <input className="input" style={{ height: 44 }} placeholder="Nombre" value={datos.nombre} onChange={e => setDatos(p => ({ ...p, nombre: e.target.value }))} />
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700 }}>
-                        <span>Total/mes</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue)' }}>{precioConIVA.toFixed(2)}€</span>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Apellidos *</div>
+                        <input className="input" style={{ height: 44 }} placeholder="Apellidos" value={datos.apellidos} onChange={e => setDatos(p => ({ ...p, apellidos: e.target.value }))} />
                       </div>
-                      {dispositivoSel && (
-                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                          Incl. cuota terminal {cuotaDisp.toFixed(2)}€/mes × {dispositivoSel.mesesFinanciacion} meses
-                        </div>
-                      )}
                     </div>
-                  </>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
-                  <button onClick={avanzar} disabled={!paso3OK} className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
-                    Continuar → Datos cliente
-                  </button>
-                  <button onClick={retroceder} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
-                    ← Atrás
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════
-            PASO 4 — DATOS DEL CLIENTE
-        ══════════════════════════════════════ */}
-        {paso === 4 && (
-          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="card">
-              <div className="card-title">Datos del cliente</div>
-
-              {/* DNI + Scoring */}
-              <div style={{ marginBottom: 14, padding: '14px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid var(--color-border-tertiary)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 8, color: 'var(--color-text-secondary)' }}>DNI / NIE / Pasaporte *</div>
-                <input className="input" placeholder="12345678A" value={datos.dni}
-                  onChange={e => { setDatos(p => ({ ...p, dni: e.target.value.toUpperCase() })); setScoring(null) }}
-                  style={{ marginBottom: 8, borderColor: datos.dni && !validarDNI(datos.dni) ? 'var(--color-red-border)' : undefined }}
-                />
-                {datos.dni && !validarDNI(datos.dni) && <div style={{ fontSize: 10, color: 'var(--color-red)', marginBottom: 8 }}>Formato inválido — 8 dígitos + 1 letra (ej: 12345678A)</div>}
-                <button
-                  onClick={ejecutarScoring}
-                  disabled={!validarDNI(datos.dni) || scoringCargando}
-                  className={scoring === null ? 'btn-primary' : scoring ? 'btn-success' : 'btn-danger'}
-                  style={{ width: '100%', justifyContent: 'center', height: 36, fontSize: 12 }}
-                >
-                  {scoringCargando
-                    ? <><span className="spinner spinner-sm" /> Verificando scoring de riesgo...</>
-                    : scoring === null ? '🔍 Ejecutar scoring de riesgo'
-                    : scoring ? '✓ Scoring OK — cliente apto · Ejecutar de nuevo'
-                    : '✕ Scoring KO — cliente no apto · Ejecutar de nuevo'
-                  }
-                </button>
-                {scoring === true && <div style={{ fontSize: 11, color: 'var(--color-green)', marginTop: 8, fontWeight: 600, textAlign: 'center' }}>✓ Cliente apto para la contratación</div>}
-                {scoring === false && <div style={{ fontSize: 11, color: 'var(--color-red)', marginTop: 8, fontWeight: 600, textAlign: 'center' }}>✕ Cliente no apto — no se puede continuar con esta oferta</div>}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Nombre *</div>
-                  <input className="input" placeholder="Nombre" value={datos.nombre} onChange={e => setDatos(p => ({ ...p, nombre: e.target.value }))} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Apellidos *</div>
-                  <input className="input" placeholder="Apellidos" value={datos.apellidos} onChange={e => setDatos(p => ({ ...p, apellidos: e.target.value }))} />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Email *</div>
-                  <input className="input" placeholder="email@ejemplo.com" value={datos.email}
-                    onChange={e => setDatos(p => ({ ...p, email: e.target.value }))}
-                    style={{ borderColor: datos.email && !validarEmail(datos.email) ? 'var(--color-red-border)' : undefined }}
-                  />
-                  {datos.email && !validarEmail(datos.email) && <div style={{ fontSize: 10, color: 'var(--color-red)', marginTop: 3 }}>Email inválido</div>}
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Teléfono *</div>
-                  <input className="input" placeholder="612 345 678" value={datos.telefono}
-                    onChange={e => setDatos(p => ({ ...p, telefono: e.target.value }))}
-                    style={{ borderColor: datos.telefono && !validarTel(datos.telefono) ? 'var(--color-red-border)' : undefined }}
-                  />
-                  {datos.telefono && !validarTel(datos.telefono) && <div style={{ fontSize: 10, color: 'var(--color-red)', marginTop: 3 }}>9 dígitos</div>}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>IBAN — Cuenta para domiciliación *</div>
-                <input className="input" placeholder="ES91 2100 0418 4502 0005 1332" value={datos.iban}
-                  onChange={e => setDatos(p => ({ ...p, iban: e.target.value.toUpperCase() }))}
-                  style={{ borderColor: datos.iban && !validarIBAN(datos.iban) ? 'var(--color-red-border)' : undefined }}
-                />
-                {datos.iban && !validarIBAN(datos.iban) && <div style={{ fontSize: 10, color: 'var(--color-red)', marginTop: 3 }}>IBAN demasiado corto</div>}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Nacionalidad</div>
-                  <select className="input" value={datos.nacionalidad} onChange={e => setDatos(p => ({ ...p, nacionalidad: e.target.value }))}>
-                    {['Española', 'Europea', 'Iberoamericana', 'Otra'].map(n => <option key={n}>{n}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--color-text-secondary)' }}>Idioma de comunicación</div>
-                  <select className="input" value={datos.idioma} onChange={e => setDatos(p => ({ ...p, idioma: e.target.value }))}>
-                    {['Castellano', 'Catalán', 'Euskera', 'Gallego', 'Inglés'].map(i => <option key={i}>{i}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 14, padding: '8px 12px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-                💡 La factura se enviará digitalmente al email indicado por defecto. El cliente puede solicitar factura en papel posteriormente.
-              </div>
-            </div>
-
-            {!paso4OK && scoring === null && validarDNI(datos.dni) && (
-              <div className="alert alert-warn">
-                <span>⚠</span>
-                <span style={{ fontSize: 11 }}>Ejecuta el scoring de riesgo antes de continuar al siguiente paso.</span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={retroceder} className="btn-secondary" style={{ fontSize: 11 }}>← Atrás</button>
-              <button onClick={avanzar} disabled={!paso4OK} className="btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
-                Continuar → Provisión
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════
-            PASO 5 — PROVISIÓN
-        ══════════════════════════════════════ */}
-        {paso === 5 && (
-          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* Instalación — solo si hay fibra */}
-            {!esSoloMovil && (
-              <div className="card">
-                <div className="card-title">Instalación de fibra</div>
-                {cob.autoinstalable ? (
-                  <div className="alert alert-ok">
-                    <span>🔧</span>
-                    <div><div style={{ fontWeight: 700 }}>Autoinstalación disponible</div><div style={{ fontSize: 11, marginTop: 2 }}>Esta dirección no requiere técnico. El cliente recibirá el equipo en casa con instrucciones.</div></div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14 }}>Selecciona la fecha y franja horaria de instalación con técnico.</div>
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: 'var(--color-text-secondary)' }}>📅 Fecha</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {fechasDisponibles.map(f => (
-                          <button key={f.val} onClick={() => setProv(p => ({ ...p, citaFecha: f.val }))}
-                            style={{ padding: '6px 12px', fontSize: 11, borderRadius: 'var(--border-radius-md)', border: `1.5px solid ${prov.citaFecha === f.val ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: prov.citaFecha === f.val ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', color: prov.citaFecha === f.val ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: prov.citaFecha === f.val ? 600 : 400 }}>
-                            {f.label}
-                          </button>
-                        ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email *</div>
+                        <input className="input" style={{ height: 44, borderColor: datos.email && !validarEmail(datos.email) ? '#EF4444' : undefined }}
+                          placeholder="email@ejemplo.com" value={datos.email} onChange={e => setDatos(p => ({ ...p, email: e.target.value }))} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Teléfono *</div>
+                        <input className="input" style={{ height: 44, borderColor: datos.telefono && !validarTel(datos.telefono) ? '#EF4444' : undefined }}
+                          placeholder="612 345 678" value={datos.telefono} onChange={e => setDatos(p => ({ ...p, telefono: e.target.value }))} />
+                        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 3 }}>Te enviaremos un SMS para confirmar el pedido</div>
                       </div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: 'var(--color-text-secondary)' }}>🕐 Franja horaria</div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {franjas.map(f => (
-                          <button key={f} onClick={() => setProv(p => ({ ...p, citaFranja: f }))}
-                            style={{ padding: '6px 14px', fontSize: 11, borderRadius: 'var(--border-radius-md)', border: `1.5px solid ${prov.citaFranja === f ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: prov.citaFranja === f ? 'var(--color-blue-light)' : 'var(--color-background-secondary)', color: prov.citaFranja === f ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: prov.citaFranja === f ? 600 : 400 }}>
-                            {f}
-                          </button>
-                        ))}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>IBAN — Cuenta para domiciliación *</div>
+                      <input className="input" style={{ height: 44, borderColor: datos.iban && !validarIBAN(datos.iban) ? '#EF4444' : undefined }}
+                        placeholder="ES91 2100 0418 4502 0005 1332" value={datos.iban} onChange={e => setDatos(p => ({ ...p, iban: e.target.value.toUpperCase() }))} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nacionalidad</div>
+                        <select className="input" style={{ height: 44 }} value={datos.nacionalidad} onChange={e => setDatos(p => ({ ...p, nacionalidad: e.target.value }))}>
+                          {['Española', 'Europea', 'Iberoamericana', 'Otra'].map(n => <option key={n}>{n}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Idioma</div>
+                        <select className="input" style={{ height: 44 }} value={datos.idioma} onChange={e => setDatos(p => ({ ...p, idioma: e.target.value }))}>
+                          {['Castellano', 'Catalán', 'Euskera', 'Gallego', 'Inglés'].map(i => <option key={i}>{i}</option>)}
+                        </select>
                       </div>
                     </div>
-                    {prov.citaFecha && prov.citaFranja && (
-                      <div className="alert alert-ok" style={{ marginTop: 12 }}>
-                        <span>✓</span>
-                        <div style={{ fontSize: 12 }}>Cita: <strong>{fechasDisponibles.find(f => f.val === prov.citaFecha)?.label}</strong> · <strong>{prov.citaFranja}</strong></div>
-                      </div>
-                    )}
-                  </>
+                    <div style={{ padding: '10px 14px', background: '#F9FAFB', borderRadius: 8, fontSize: 12, color: '#6B7280' }}>
+                      💡 La factura se enviará digitalmente al email indicado por defecto.
+                    </div>
+                  </div>
+                )}
+
+                {scoring === false && (
+                  <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#991B1B', marginTop: 8 }}>
+                    ✕ Cliente no apto — no se puede continuar con esta oferta
+                  </div>
                 )}
               </div>
-            )}
 
-            {/* SIM */}
-            {(tieneLinea || esSoloMovil) && (
-              <div className="card">
-                <div className="card-title">SIM / eSIM</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {[['fisica', '💳', 'SIM física', 'Tarjeta física por correo o recogida en tienda'], ['esim', '📲', 'eSIM', 'Activación digital inmediata en el dispositivo']] .map(([val, ico, tit, desc]) => (
-                    <div key={val} onClick={() => setProv(p => ({ ...p, sim: val as 'fisica' | 'esim' }))}
-                      style={{ padding: '14px', border: `1.5px solid ${prov.sim === val ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: prov.sim === val ? 'var(--color-blue-light)' : 'transparent', textAlign: 'center', transition: 'all 0.1s' }}>
-                      <div style={{ fontSize: 24, marginBottom: 6 }}>{ico}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: prov.sim === val ? 'var(--color-blue-dark)' : 'var(--color-text-primary)', marginBottom: 4 }}>{tit}</div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{desc}</div>
+              {!paso3OK && scoring === null && validarDNI(datos.dni) && (
+                <div style={{ padding: '12px 16px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, fontSize: 13, color: '#92400E' }}>
+                  ⚠ Ejecuta el scoring de riesgo antes de continuar.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={retroceder} style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                  ← Atrás
+                </button>
+                <button onClick={avanzar} disabled={!paso3OK}
+                  style={{ padding: '12px 32px', background: paso3OK ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: paso3OK ? 'pointer' : 'not-allowed' }}>
+                  Continuar → Instalación
+                </button>
+              </div>
+            </div>
+
+            <ResumenLateral />
+          </div>
+        )}
+
+        {/* ══════════ PASO 4 — PROVISIÓN ══════════ */}
+        {paso === 4 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Instalación fibra */}
+              {!esSoloMovil && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>📅 Cita de instalación</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Selecciona la fecha y franja horaria de instalación con técnico.</div>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Fecha</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {fechasDisponibles.map(f => (
+                        <button key={f.val} onClick={() => setProv(p => ({ ...p, citaFecha: f.val }))}
+                          style={{ padding: '8px 16px', fontSize: 12, border: `2px solid ${prov.citaFecha === f.val ? BLUE : '#E5E7EB'}`, borderRadius: 8, background: 'white', color: prov.citaFecha === f.val ? BLUE : '#374151', cursor: 'pointer', fontWeight: prov.citaFecha === f.val ? 600 : 400 }}>
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Franja horaria</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {franjas.map(f => (
+                        <button key={f} onClick={() => setProv(p => ({ ...p, citaFranja: f }))}
+                          style={{ padding: '8px 16px', fontSize: 12, border: `2px solid ${prov.citaFranja === f ? BLUE : '#E5E7EB'}`, borderRadius: 8, background: 'white', color: prov.citaFranja === f ? BLUE : '#374151', cursor: 'pointer', fontWeight: prov.citaFranja === f ? 600 : 400 }}>
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {prov.citaFecha && prov.citaFranja && (
+                    <div style={{ marginTop: 14, padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534', fontWeight: 600 }}>
+                      ✓ Cita: {fechasDisponibles.find(f => f.val === prov.citaFecha)?.label} · {prov.citaFranja}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SIM */}
+              {(tieneLinea || esSoloMovil) && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 }}>SIM / eSIM</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {([['fisica', '💳', 'SIM física', 'Tarjeta física — correo o recogida en tienda'], ['esim', '📲', 'eSIM', 'Activación digital inmediata en el dispositivo']] as const).map(([val, ico, tit, desc]) => (
+                      <div key={val} onClick={() => setProv(p => ({ ...p, sim: val }))
+                      } style={{ padding: '16px', border: `2px solid ${prov.sim === val ? BLUE : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: prov.sim === val ? BLUE_LIGHT : 'white', textAlign: 'center' }}>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>{ico}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: prov.sim === val ? BLUE : '#111827', marginBottom: 4 }}>{tit}</div>
+                        <div style={{ fontSize: 11, color: '#9CA3AF' }}>{desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Entrega */}
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 }}>Entrega de equipos{dispositivoSel ? ' y dispositivo' : ''}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {([['domicilio', '🏠', 'Envío a domicilio', 'Recibirás el equipo en 2-3 días hábiles'], ['tienda', '🏪', 'Recogida en tienda', 'El cliente recoge el equipo en la tienda hoy']] as const).map(([val, ico, tit, desc]) => (
+                    <div key={val} onClick={() => setProv(p => ({ ...p, entrega: val }))}
+                      style={{ padding: '16px', border: `2px solid ${prov.entrega === val ? BLUE : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', background: prov.entrega === val ? BLUE_LIGHT : 'white', textAlign: 'center' }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>{ico}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: prov.entrega === val ? BLUE : '#111827', marginBottom: 4 }}>{tit}</div>
+                      <div style={{ fontSize: 11, color: '#9CA3AF' }}>{desc}</div>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* FTTR */}
-            <div className="card">
-              <div className="card-title">FTTR — Fiber to the Room (opcional)</div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
-                Extiende la fibra óptica a cada habitación del hogar. Selecciona si el cliente quiere incluirlo y qué modalidad.
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {([
-                  ['no',              '❌', 'Sin FTTR',        '',                          ''],
-                  ['con-instalacion', '🔧', 'Con instalación', '+12€/mes durante 48 meses', 'Un técnico instala la fibra en cada habitación'],
-                ] as const).map(([val, ico, tit, precio, desc]) => (
-                  <div key={val}
-                    onClick={() => setProv(p => ({ ...p, fttr: val }))}
-                    style={{
-                      padding: '14px 10px',
-                      border: `1.5px solid ${prov.fttr === val ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`,
-                      borderRadius: 'var(--border-radius-lg)',
-                      cursor: 'pointer',
-                      background: prov.fttr === val ? 'var(--color-blue-light)' : 'transparent',
-                      textAlign: 'center',
-                      transition: 'all 0.1s'
-                    }}>
-                    <div style={{ fontSize: 22, marginBottom: 8 }}>{ico}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: prov.fttr === val ? 'var(--color-blue-dark)' : 'var(--color-text-primary)', marginBottom: 4 }}>{tit}</div>
-                    {precio && <div style={{ fontSize: 11, fontWeight: 600, color: val === 'con-instalacion' ? 'var(--color-blue-dark)' : 'var(--color-green-dark)', marginBottom: 4 }}>{precio}</div>}
-                    {desc && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>{desc}</div>}
-                  </div>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={retroceder} style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                  ← Atrás
+                </button>
+                <button onClick={avanzar} disabled={!paso4OK}
+                  style={{ padding: '12px 32px', background: paso4OK ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: paso4OK ? 'pointer' : 'not-allowed' }}>
+                  Continuar → Resumen y firma
+                </button>
               </div>
             </div>
 
-            {/* Entrega router/dispositivo */}
-            <div className="card">
-              <div className="card-title">Entrega de equipos{dispositivoSel ? ' y dispositivo' : ''}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {[['domicilio', '🏠', 'Envío a domicilio', 'Recibirás el equipo en 2-3 días hábiles'], ['tienda', '🏪', 'Recogida en tienda', 'El cliente recoge el equipo en la tienda hoy']].map(([val, ico, tit, desc]) => (
-                  <div key={val} onClick={() => setProv(p => ({ ...p, entrega: val as 'domicilio' | 'tienda' }))}
-                    style={{ padding: '14px', border: `1.5px solid ${prov.entrega === val ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: 'pointer', background: prov.entrega === val ? 'var(--color-blue-light)' : 'transparent', textAlign: 'center', transition: 'all 0.1s' }}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>{ico}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: prov.entrega === val ? 'var(--color-blue-dark)' : 'var(--color-text-primary)', marginBottom: 4 }}>{tit}</div>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={retroceder} className="btn-secondary" style={{ fontSize: 11 }}>← Atrás</button>
-              <button onClick={avanzar} disabled={!paso5OK} className="btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
-                Continuar → Resumen y firma
-              </button>
-            </div>
+            <ResumenLateral />
           </div>
         )}
 
-        {/* ══════════════════════════════════════
-            PASO 6 — RESUMEN Y FIRMA
-        ══════════════════════════════════════ */}
-        {paso === 6 && (
-          <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {firmado ? (
-              <div className="card fade-in" style={{ textAlign: 'center', padding: '40px 24px' }}>
-                <div style={{ fontSize: 52, marginBottom: 16 }}>🎉</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-green)', marginBottom: 8 }}>Alta completada correctamente</div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 24 }}>OTP verificado · Pedido generado · Confirmación enviada a <strong>{datos.email}</strong></div>
-                <button onClick={() => navigate('/')} className="btn-primary" style={{ fontSize: 12 }}>Volver al inicio</button>
+        {/* ══════════ PASO 5 — VENTA CONSCIENTE + FIRMA ══════════ */}
+        {paso === 5 && (
+          firmado ? (
+            <div style={{ maxWidth: 600, margin: '40px auto', background: 'white', border: '1px solid #E5E7EB', borderRadius: 16, padding: '48px 40px', textAlign: 'center', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 56, marginBottom: 20 }}>🎉</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#16A34A', marginBottom: 10 }}>Alta completada correctamente</div>
+              <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 28, lineHeight: 1.6 }}>
+                OTP verificado · Pedido generado · Confirmación enviada a <strong>{datos.email}</strong>
               </div>
-            ) : (
-              <>
+              <button onClick={() => navigate('/')} style={{ padding: '12px 32px', background: BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                Volver al inicio
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
                 {/* Venta consciente */}
-                <div style={{ padding: '16px', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', borderRadius: 'var(--border-radius-lg)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <div style={{ width: 24, height: 24, background: 'var(--color-blue)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#fff' }}>💬</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)' }}>Venta consciente — repasa esto con el cliente</div>
+                <div style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE_BORDER}`, borderRadius: 12, padding: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <div style={{ width: 28, height: 28, background: BLUE, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'white' }}>💬</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: BLUE }}>Venta consciente — repasa con el cliente</div>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--color-blue-dark)', lineHeight: 1.9 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
                     <div>✓ Contratas <strong>{bundleSel?.nombre}</strong>{addonsSel.size > 0 ? ` con ${catalogoAddonsTV.filter(a => addonsSel.has(a.id)).map(a => a.nombre).join(' y ')}` : ''}.</div>
                     <div>✓ Tu cuota mensual es de <strong>{precioConIVA.toFixed(2)}€ con IVA</strong> ({precioTotal.toFixed(2)}€ sin IVA).</div>
                     {dispositivoSel && <div>✓ Además, {dispositivoSel.mesesFinanciacion} cuotas de <strong>{cuotaDisp.toFixed(2)}€/mes</strong> por el {dispositivoSel.marca} {dispositivoSel.modelo}.</div>}
+                    {fttr === 'con-instalacion' && <div>✓ FTTR incluido: +12€/mes durante 48 meses para fibra en cada habitación.</div>}
                     <div>✓ El cobro se realizará por domiciliación bancaria en la cuenta indicada.</div>
                     <div>✓ Recibirás la factura digitalmente en <strong>{datos.email}</strong>.</div>
-                    {!esSoloMovil && !cob.autoinstalable && prov.citaFecha && <div>✓ Cita de instalación: <strong>{fechasDisponibles.find(f => f.val === prov.citaFecha)?.label}</strong> de <strong>{prov.citaFranja}</strong>.</div>}
-                    {(esSoloMovil || cob.autoinstalable) && <div>✓ Recibirás el equipo en tu domicilio con instrucciones de instalación.</div>}
-                    {prov.fttr !== 'no' && (
-                      <div>✓ FTTR incluido con instalación profesional — +12€/mes durante 48 meses.</div>
+                    {portaLineas !== 'ninguna' && (
+                      <div>✓ Portabilidad solicitada para {portaLineas === 'primera' ? 'la línea principal' : portaLineas === 'segunda' ? 'la segunda línea' : 'ambas líneas'} — ventana de 10 días hábiles.</div>
+                    )}
+                    {!esSoloMovil && prov.citaFecha && (
+                      <div>✓ Cita de instalación: <strong>{fechasDisponibles.find(f => f.val === prov.citaFecha)?.label}</strong> de <strong>{prov.citaFranja}</strong>.</div>
+                    )}
+                    {prov.sim === 'esim' && <div>✓ eSIM — activación digital inmediata.</div>}
+                    {prov.entrega === 'tienda' && <div>✓ Recogida de equipo en tienda hoy.</div>}
+                    {senalizaciones.length > 0 && (
+                      <div>✓ Señalizaciones pendientes: <strong>{senalizaciones.join(', ')}</strong> — un especialista contactará al cliente.</div>
                     )}
                   </div>
                 </div>
 
-                <div className="grid2">
-                  {/* Resumen contrato */}
-                  <div className="card">
-                    <div className="card-title">Resumen del contrato</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{bundleSel?.nombre}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 12 }}>{bundleSel?.descripcion}</div>
-
-                    {addonsSel.size > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Add-ons TV</div>
-                        {catalogoAddonsTV.filter(a => addonsSel.has(a.id)).map(a => (
-                          <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
-                            <span>{a.nombre}</span><span style={{ fontFamily: 'var(--font-mono)' }}>+{a.precio.toFixed(2)}€</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {prov.fttr === 'con-instalacion' && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderTop: '1px dashed var(--color-border-secondary)', marginTop: 4 }}>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>FTTR — Fiber to the Room</span>
-                        <span style={{ fontFamily: 'var(--font-mono)' }}>+12,00€</span>
-                      </div>
-                    )}
-
-                    {dispositivoSel && (
-                      <div style={{ marginBottom: 10, padding: '8px 10px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Dispositivo</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                          <span>{dispositivoSel.marca} {dispositivoSel.modelo}</span>
-                          <span style={{ fontFamily: 'var(--font-mono)' }}>{cuotaDisp.toFixed(2)}€/mes × {dispositivoSel.mesesFinanciacion}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div style={{ borderTop: '1px solid var(--color-border-secondary)', paddingTop: 10 }}>
-                      {[
-                        { l: 'Subtotal sin IVA', v: `${precioTotal.toFixed(2)}€` },
-                        { l: 'IVA (21%)', v: `${(precioConIVA - precioTotal).toFixed(2)}€` },
-                      ].map(r => (
-                        <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-                          <span>{r.l}</span><span style={{ fontFamily: 'var(--font-mono)' }}>{r.v}</span>
-                        </div>
-                      ))}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, marginTop: 6 }}>
-                        <span>Total mensual</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue)' }}>{precioConIVA.toFixed(2)}€</span>
-                      </div>
-                    </div>
-
-                    <div style={{ borderTop: '1px solid var(--color-border-secondary)', paddingTop: 12, marginTop: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Instalación y provisión</div>
-                      {[
-                        !esSoloMovil && { label: 'Dirección', val: `${cob.calle} ${cob.numero}, ${cob.cp} ${cob.ciudad}` },
-                        !esSoloMovil && { label: 'Tecnología', val: 'Fibra óptica' },
-                        !esSoloMovil && !cob.autoinstalable && prov.citaFecha && { label: 'Cita técnico', val: `${fechasDisponibles.find(f => f.val === prov.citaFecha)?.label} · ${prov.citaFranja}` },
-                        (esSoloMovil || cob.autoinstalable) && { label: 'Provisión', val: 'Autoinstalación / envío a domicilio' },
-                        { label: 'Entrega', val: prov.entrega === 'domicilio' ? 'Envío a domicilio (2-3 días)' : 'Recogida en tienda hoy' },
-                        prov.fttr !== 'no' && { label: 'FTTR', val: 'Con instalación (+12€/mes × 48 meses)' },
-                        (tieneLinea || esSoloMovil) && { label: 'SIM', val: prov.sim === 'fisica' ? 'SIM física' : 'eSIM' },
-                      ].filter(Boolean).map((row: any) => (
-                        <div key={row.label} className="table-row">
-                          <span className="table-row-label">{row.label}</span>
-                          <span className="table-row-value">{row.val}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Titular + firma */}
-                  <div className="card">
-                    <div className="card-title">Datos del titular</div>
+                {/* Resumen contrato */}
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 16 }}>Resumen del contrato</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
                     {[
-                      { label: 'Nombre', val: `${datos.nombre} ${datos.apellidos}` },
-                      { label: 'DNI/NIE', val: datos.dni },
-                      { label: 'Email', val: datos.email },
-                      { label: 'Teléfono', val: datos.telefono },
-                      { label: 'IBAN', val: datos.iban.replace(/(.{4})/g, '$1 ').trim() },
-                      { label: 'Idioma', val: datos.idioma },
+                      { l: 'Bundle', v: bundleSel?.nombre || '—' },
+                      { l: 'Titular', v: `${datos.nombre} ${datos.apellidos}` },
+                      { l: 'DNI', v: datos.dni },
+                      { l: 'Email', v: datos.email },
+                      { l: 'Teléfono', v: datos.telefono },
+                      { l: 'IBAN', v: datos.iban.replace(/(.{4})/g, '$1 ').trim() },
+                      ...(!esSoloMovil && cob.verificada ? [{ l: 'Dirección', v: `${cob.calle} ${cob.numero}, ${cob.cp} ${cob.ciudad}` }] : []),
+                      ...(!esSoloMovil && prov.citaFecha ? [{ l: 'Cita técnico', v: `${fechasDisponibles.find(f => f.val === prov.citaFecha)?.label} · ${prov.citaFranja}` }] : []),
+                      { l: 'SIM', v: prov.sim === 'fisica' ? 'SIM física' : 'eSIM' },
+                      { l: 'Entrega', v: prov.entrega === 'domicilio' ? 'Envío a domicilio (2-3 días)' : 'Recogida en tienda hoy' },
                     ].map(row => (
-                      <div key={row.label} className="table-row">
-                        <span className="table-row-label">{row.label}</span>
-                        <span className="table-row-value">{row.val}</span>
+                      <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid #F3F4F6' }}>
+                        <span style={{ color: '#9CA3AF' }}>{row.l}</span>
+                        <span style={{ color: '#111827', fontWeight: 500, textAlign: 'right', maxWidth: '60%' }}>{row.v}</span>
                       </div>
                     ))}
-
-                    <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
-                      Al firmar, el cliente acepta las condiciones generales del servicio, la política de privacidad y autoriza la domiciliación bancaria para el pago de las facturas mensuales.
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, paddingTop: 10, borderTop: '2px solid #E5E7EB' }}>
+                      <span>Total mensual c/IVA</span>
+                      <span style={{ color: BLUE }}>{(precioConIVA + cuotaDisp * 1.21).toFixed(2)}€</span>
                     </div>
-
-                    <button
-                      onClick={() => { setFirmando(true); setTimeout(() => { setFirmando(false); setFirmado(true) }, 2000) }}
-                      disabled={firmando}
-                      className="btn-primary"
-                      style={{ width: '100%', justifyContent: 'center', height: 44, fontSize: 14, marginTop: 14 }}
-                    >
-                      {firmando
-                        ? <><span className="spinner spinner-sm" /> Enviando OTP al {datos.telefono}...</>
-                        : '🔐 Firmar contrato con OTP'
-                      }
-                    </button>
-                    <button onClick={retroceder} className="btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: 11, marginTop: 8 }}>
-                      ← Volver a provisión
-                    </button>
                   </div>
                 </div>
-              </>
-            )}
-          </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <button onClick={retroceder} style={{ padding: '10px 20px', border: '1.5px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#6B7280' }}>
+                    ← Atrás
+                  </button>
+                </div>
+              </div>
+
+              <ResumenLateral mostrarFirma={true} />
+            </div>
+          )
         )}
       </div>
 
-      {/* ══════════════════════════════════════
-          MODAL ESCAPARATE DISPOSITIVOS
-      ══════════════════════════════════════ */}
+      {/* ══════════ MODAL ESCAPARATE DISPOSITIVOS ══════════ */}
       {modalAbierto && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}
           onClick={e => { if (e.target === e.currentTarget) setModalAbierto(false) }}>
-          <div style={{ background: 'var(--color-background-primary)', borderRadius: 'var(--border-radius-lg)', width: '100%', maxWidth: 960, boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
+          <div style={{ background: 'white', borderRadius: 12, width: '100%', maxWidth: 960, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
 
-            {/* Header modal */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>Escaparate de dispositivos</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{dispositivosFiltrados.length} dispositivos disponibles</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Escaparate de dispositivos</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF' }}>{dispositivosFiltrados.length} dispositivos disponibles</div>
               </div>
-              <button onClick={() => setModalAbierto(false)} style={{ width: 28, height: 28, borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-secondary)', background: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              <button onClick={() => setModalAbierto(false)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #E5E7EB', background: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
 
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-              {/* Panel filtros */}
-              <div style={{ width: 220, borderRight: '1px solid var(--color-border-tertiary)', padding: '16px', overflowY: 'auto', flexShrink: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Filtros</div>
+              {/* Filtros */}
+              <div style={{ width: 220, borderRight: '1px solid #E5E7EB', padding: '20px', overflowY: 'auto', flexShrink: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Filtros</div>
 
-                {/* Ordenación */}
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8 }}>Ordenar por</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Ordenar por</div>
                   {[['relevancia', 'Relevancia'], ['precio_asc', 'Precio: menor a mayor'], ['precio_desc', 'Precio: mayor a menor']].map(([val, label]) => (
                     <div key={val} onClick={() => setFiltroOrden(val as any)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', cursor: 'pointer', fontSize: 11, color: filtroOrden === val ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', fontWeight: filtroOrden === val ? 600 : 400 }}>
-                      <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${filtroOrden === val ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: filtroOrden === val ? 'var(--color-blue)' : 'transparent' }} />
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer', fontSize: 13, color: filtroOrden === val ? BLUE : '#374151', fontWeight: filtroOrden === val ? 600 : 400 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${filtroOrden === val ? BLUE : '#D1D5DB'}`, background: filtroOrden === val ? BLUE : 'transparent', flexShrink: 0 }} />
                       {label}
                     </div>
                   ))}
                 </div>
 
-                {/* Rango precio */}
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8 }}>Precio</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Precio</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6B7280', marginBottom: 8 }}>
                     <span>{filtroPrecioMin}€</span>
                     <span>{filtroPrecioMax === 2000 ? '2000€+' : `${filtroPrecioMax}€`}</span>
                   </div>
-                  <div style={{ position: 'relative', height: 20, marginBottom: 6 }}>
-                    <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 4, background: 'var(--color-border-secondary)', borderRadius: 2, transform: 'translateY(-50%)' }}>
-                      <div style={{ position: 'absolute', left: `${(filtroPrecioMin / 2000) * 100}%`, right: `${100 - (filtroPrecioMax / 2000) * 100}%`, background: 'var(--color-blue)', height: '100%', borderRadius: 2 }} />
-                    </div>
-                    <input type="range" min={0} max={2000} step={50} value={filtroPrecioMin}
-                      onChange={e => setFiltroPrecioMin(Math.min(Number(e.target.value), filtroPrecioMax - 50))}
-                      style={{ position: 'absolute', width: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }}
-                    />
-                  </div>
-                  <div style={{ position: 'relative', height: 20 }}>
-                    <input type="range" min={0} max={2000} step={50} value={filtroPrecioMax}
-                      onChange={e => setFiltroPrecioMax(Math.max(Number(e.target.value), filtroPrecioMin + 50))}
-                      style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--color-blue)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <input type="range" min={0} max={2000} step={50} value={filtroPrecioMax}
+                    onChange={e => setFiltroPrecioMax(Math.max(Number(e.target.value), filtroPrecioMin + 50))}
+                    style={{ width: '100%', cursor: 'pointer', accentColor: BLUE }} />
+                  <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
                     {[300, 500, 800, 1200].map(p => (
                       <button key={p} onClick={() => { setFiltroPrecioMin(0); setFiltroPrecioMax(p) }}
-                        style={{ flex: 1, padding: '3px 0', fontSize: 9, borderRadius: 3, border: `1px solid ${filtroPrecioMax === p && filtroPrecioMin === 0 ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: filtroPrecioMax === p && filtroPrecioMin === 0 ? 'var(--color-blue-light)' : 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
+                        style={{ flex: 1, padding: '3px', fontSize: 10, borderRadius: 4, border: `1px solid ${filtroPrecioMax === p && filtroPrecioMin === 0 ? BLUE : '#E5E7EB'}`, background: filtroPrecioMax === p && filtroPrecioMin === 0 ? BLUE_LIGHT : 'white', cursor: 'pointer', color: '#6B7280' }}>
                         &lt;{p}€
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Marcas */}
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8 }}>Marca</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Marca</div>
                   {marcasDisponibles.map(m => (
                     <div key={m} onClick={() => toggleMarca(m)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 0', cursor: 'pointer', fontSize: 11, color: filtroMarcas.has(m) ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', fontWeight: filtroMarcas.has(m) ? 600 : 400 }}>
-                      <div style={{ width: 13, height: 13, borderRadius: 3, border: `2px solid ${filtroMarcas.has(m) ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: filtroMarcas.has(m) ? 'var(--color-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#fff', flexShrink: 0 }}>
-                        {filtroMarcas.has(m) ? '✓' : ''}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer', fontSize: 13, color: filtroMarcas.has(m) ? BLUE : '#374151', fontWeight: filtroMarcas.has(m) ? 600 : 400 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${filtroMarcas.has(m) ? BLUE : '#D1D5DB'}`, background: filtroMarcas.has(m) ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {filtroMarcas.has(m) && <span style={{ fontSize: 9, color: 'white', fontWeight: 700 }}>✓</span>}
                       </div>
                       {m}
                     </div>
                   ))}
                 </div>
 
-                {/* Categoría */}
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8 }}>Categoría</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Categoría</div>
                   {['todas', ...categoriasDisponibles].map(c => (
                     <div key={c} onClick={() => setFiltroCategoria(c)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', cursor: 'pointer', fontSize: 11, color: filtroCategoria === c ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', fontWeight: filtroCategoria === c ? 600 : 400 }}>
-                      <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${filtroCategoria === c ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: filtroCategoria === c ? 'var(--color-blue)' : 'transparent' }} />
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer', fontSize: 13, color: filtroCategoria === c ? BLUE : '#374151', fontWeight: filtroCategoria === c ? 600 : 400 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${filtroCategoria === c ? BLUE : '#D1D5DB'}`, background: filtroCategoria === c ? BLUE : 'transparent', flexShrink: 0 }} />
                       {c === 'todas' ? 'Todas' : c.charAt(0).toUpperCase() + c.slice(1)}
                     </div>
                   ))}
                 </div>
 
-                {/* Reset */}
                 {hayFiltros && (
                   <button onClick={() => { setFiltroMarcas(new Set()); setFiltroCategoria('todas'); setFiltroPrecioMin(0); setFiltroPrecioMax(2000); setFiltroOrden('relevancia') }}
-                    className="btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
+                    style={{ width: '100%', padding: '8px', border: '1px solid #E5E7EB', borderRadius: 8, background: 'white', fontSize: 12, cursor: 'pointer', color: '#6B7280' }}>
                     ↺ Limpiar filtros
                   </button>
                 )}
               </div>
 
-              {/* Grid dispositivos */}
-              <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
+              {/* Grid */}
+              <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
                 {dispositivosMostrados.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF', fontSize: 13 }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
                     Sin dispositivos para estos filtros
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                       {dispositivosMostrados.map(d => {
-                        const seleccionado = dispositivoSel?.id === d.id
+                        const sel = dispositivoSel?.id === d.id
                         return (
-                          <div key={d.id}
-                            onClick={() => { setDispositivoSel(seleccionado ? null : d); setModalAbierto(false) }}
-                            style={{ padding: '14px 12px', border: `1.5px solid ${seleccionado ? 'var(--color-blue)' : d.destacado ? 'var(--color-amber-border)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-lg)', cursor: d.stock ? 'pointer' : 'not-allowed', background: seleccionado ? 'var(--color-blue-light)' : d.destacado ? 'var(--color-amber-light)' : 'var(--color-background-secondary)', opacity: d.stock ? 1 : 0.5, transition: 'all 0.1s', position: 'relative' }}>
-                            {d.destacado && !seleccionado && <div style={{ position: 'absolute', top: 6, right: 6, fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'var(--color-amber-mid)', color: 'var(--color-amber-dark)', fontWeight: 700 }}>DEST.</div>}
-                            {!d.stock && <div style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'var(--color-red-light)', color: 'var(--color-red-dark)', fontWeight: 700 }}>AGOTADO</div>}
-                            {d.ahorro && d.stock && <div style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'var(--color-green-light)', color: 'var(--color-green-dark)', fontWeight: 700 }}>-{d.ahorro}€</div>}
-
-                            <div style={{ textAlign: 'center', fontSize: 36, marginBottom: 8, marginTop: (d.destacado || !d.stock || d.ahorro) ? 12 : 0 }}>{d.imagen}</div>
-                            <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: seleccionado ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{d.marca}</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: seleccionado ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>{d.modelo}</div>
-
-                            {d.storage && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>{d.storage}{d.pantalla ? ` · ${d.pantalla}` : ''}</div>}
-
-                            <div style={{ borderTop: '1px solid var(--color-border-tertiary)', paddingTop: 8, marginTop: 6 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: seleccionado ? 'var(--color-blue-dark)' : 'var(--color-blue)' }}>
-                                {d.precioMensual.toFixed(2)}€<span style={{ fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>/mes</span>
-                              </div>
-                              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{d.precioLibre}€ libre · {d.mesesFinanciacion} meses</div>
-                            </div>
-
-                            {seleccionado && (
-                              <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'var(--color-blue-dark)', textAlign: 'center' }}>✓ Seleccionado</div>
-                            )}
+                          <div key={d.id} onClick={() => { setDispositivoSel(sel ? null : d); setModalAbierto(false) }}
+                            style={{ padding: '16px', border: `2px solid ${sel ? BLUE : d.destacado ? '#FCD34D' : '#E5E7EB'}`, borderRadius: 10, cursor: d.stock ? 'pointer' : 'not-allowed', background: sel ? BLUE_LIGHT : d.destacado ? '#FFFBEB' : 'white', opacity: d.stock ? 1 : 0.5, position: 'relative', transition: 'all 0.1s' }}
+                            onMouseEnter={e => { if (d.stock) e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)' }}
+                            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
+                            {d.destacado && !sel && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, padding: '2px 6px', borderRadius: 10, background: '#FCD34D', color: '#92400E', fontWeight: 700 }}>DEST.</div>}
+                            {!d.stock && <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, padding: '2px 6px', borderRadius: 10, background: '#FEE2E2', color: '#991B1B', fontWeight: 700 }}>AGOTADO</div>}
+                            {d.ahorro && d.stock && <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, padding: '2px 6px', borderRadius: 10, background: '#DCFCE7', color: '#166534', fontWeight: 700 }}>-{d.ahorro}€</div>}
+                            <div style={{ textAlign: 'center', fontSize: 40, marginBottom: 10, marginTop: (d.destacado || !d.stock || d.ahorro) ? 14 : 0 }}>{d.imagen}</div>
+                            <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 2 }}>{d.marca}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: sel ? BLUE : '#111827' }}>{d.modelo}</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: sel ? BLUE : BLUE, fontFamily: 'var(--font-mono)' }}>{d.precioMensual.toFixed(2)}€<span style={{ fontSize: 10, fontWeight: 400, color: '#9CA3AF' }}>/mes</span></div>
+                            <div style={{ fontSize: 11, color: '#9CA3AF' }}>{d.precioLibre}€ libre · {d.storage}</div>
+                            {sel && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: BLUE, textAlign: 'center' }}>✓ Seleccionado</div>}
                           </div>
                         )
                       })}
                     </div>
-
-                    {/* Mostrar más */}
                     {hayMas && (
-                      <div style={{ textAlign: 'center', marginTop: 16 }}>
-                        <button onClick={() => setMostrarMas(true)} className="btn-secondary" style={{ fontSize: 12 }}>
-                          Ver {Math.min(10, dispositivosFiltrados.length - 10)} dispositivos más →
+                      <div style={{ textAlign: 'center', marginTop: 20 }}>
+                        <button onClick={() => setMostrarMas(true)} style={{ padding: '10px 24px', border: `1.5px solid ${BLUE}`, borderRadius: 8, color: BLUE, background: 'white', fontSize: 13, cursor: 'pointer' }}>
+                          Ver más dispositivos →
                         </button>
-                      </div>
-                    )}
-                    {mostrarMas && !hayFiltros && (
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', marginTop: 12 }}>
-                        Usa los filtros para refinar tu búsqueda en el catálogo completo
                       </div>
                     )}
                   </>

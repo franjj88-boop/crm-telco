@@ -21,8 +21,9 @@ export function HomePage() {
   // Calcular diferencias reales entre facturas
   const calcularDiferencias = () => {
     if (datos.facturas.length < 2) return []
-    const actual = datos.facturas[0]
-    const anterior = datos.facturas[1]
+    const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
+    const actual = facturasNormales[0]
+    const anterior = facturasNormales[1]
     const diffs: { concepto: string; anterior: number; actual: number; delta: number; tipo: 'subida' | 'bajada' | 'nuevo' | 'eliminado' }[] = []
 
     actual.conceptos.forEach(ca => {
@@ -49,8 +50,9 @@ export function HomePage() {
   }
 
   const diferencias = calcularDiferencias()
-  const deltaTotalFactura = datos.facturas.length >= 2
-    ? datos.facturas[0].importe - datos.facturas[1].importe
+  const facturasNormalesHome = datos.facturas.filter(f => !(f as any).esRectificativa)
+  const deltaTotalFactura = facturasNormalesHome.length >= 2
+    ? facturasNormalesHome[0].importe - facturasNormalesHome[1].importe
     : 0
 
   return (
@@ -162,7 +164,7 @@ export function HomePage() {
 
               {/* Resumen por factura */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                {datos.facturas.slice(0, 2).map((f, i) => (
+                {facturasNormalesHome.slice(0, 2).map((f, i) => (
                   <div key={f.id} style={{ flex: 1, padding: '8px 10px', background: i === 0 ? 'var(--color-background-secondary)' : 'transparent', border: `1px solid ${f.estado === 'vencida' ? 'var(--color-red-border)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-md)' }}>
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>{i === 0 ? 'Actual' : 'Anterior'} · {f.periodo}</div>
                     <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: f.estado === 'vencida' ? 'var(--color-red)' : 'var(--color-text-primary)' }}>{f.importe.toFixed(2)}€</div>

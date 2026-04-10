@@ -270,8 +270,9 @@ export function FacturacionPage() {
   const reclamacionFactura = factura ? reclamacionesPorFactura[factura.id] : null
 
   // Comparativa automática con factura anterior
-  const facturaActualIdx = factura ? datos.facturas.indexOf(factura) : 0
-  const facturaAnteriorAuto = datos.facturas[facturaActualIdx + 1] || null
+  const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
+  const facturaActualIdx = factura ? facturasNormales.indexOf(factura) : 0
+  const facturaAnteriorAuto = facturasNormales[facturaActualIdx + 1] || null
   const diffsAuto = factura && facturaAnteriorAuto ? calcDiffs(factura, facturaAnteriorAuto) : []
   const deltaAuto = factura && facturaAnteriorAuto ? factura.importe - facturaAnteriorAuto.importe : 0
 
@@ -772,7 +773,7 @@ export function FacturacionPage() {
 
             {/* ── SPARKLINE evolución importes ── */}
             {(() => {
-              const ultimas = datos.facturas.slice(0, 12).reverse()
+              const ultimas = datos.facturas.filter(f => !(f as any).esRectificativa).slice(0, 12).reverse()
               const max = Math.max(...ultimas.map(f => f.importe))
               const min = Math.min(...ultimas.map(f => f.importe))
               return (
@@ -872,7 +873,7 @@ export function FacturacionPage() {
               const paginadas = filtradas.slice(paginaFacturas * FACTURAS_POR_PAGINA, (paginaFacturas + 1) * FACTURAS_POR_PAGINA)
               return <>
                 {paginadas.map((f, idx) => {
-                  const arr = filtradas
+                  const arr = filtradas.filter(f => !(f as any).esRectificativa)
               const isActive = factura?.id === f.id
               const tieneAnomalos = f.conceptos.some(c => c.anomalo)
               const tieneReclamacion = !!reclamacionesPorFactura[f.id]
