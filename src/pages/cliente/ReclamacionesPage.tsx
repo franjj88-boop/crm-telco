@@ -159,7 +159,7 @@ export function ReclamacionesPage() {
       color: 'var(--color-red-mid)',
       bg: 'var(--color-red-light)',
       border: 'var(--color-red-border)',
-      count: datos.reclamaciones.filter(r => r.tipo === 'economica' || !r.tipo).length,
+      count: datos.reclamaciones.filter(r => (r as any).tipo === 'economica' || !(r as any).tipo).length,
     },
     {
       key: 'provision' as Tipologia,

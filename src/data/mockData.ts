@@ -1,5 +1,5 @@
 import type {
-  Cliente, Bundle, AddonTV, LineaAdicional, Dispositivo, ResultadoBusquedaBundle
+  Cliente, Bundle, AddonTV, LineaAdicional, Dispositivo, ResultadoBusquedaBundle, SatisfaccionRiesgo
 } from '../types'
 
 // ═══════════════════════════════════════════════════════════════
@@ -230,7 +230,7 @@ export function buscarBundles(
         diferencias.push(`2ª línea ilimitada en lugar de ${datosSecundaria}GB`)
       } else {
         score += 8
-        diferencias.push(`2ª línea ${datosBundle === 'ilimitado' ? 'Ilimitado' : datosBundle + 'GB'} (solicitaste ${datosSecundaria === 'ilimitado' ? 'Ilimitado' : datosSecundaria + 'GB'})`)
+        diferencias.push(`2ª línea ${datosBundle === 'ilimitado' ? 'Ilimitado' : String(datosBundle) + 'GB'} (solicitaste ${datosSecundaria === 'ilimitado' ? 'Ilimitado' : String(datosSecundaria) + 'GB'})`)
       }
     }
 
@@ -937,8 +937,8 @@ export const historicoPagosPorCliente: Record<string, {
 }
 
 // ── ÍNDICE BÚSQUEDA ──
-export const clientesLista = [
-  { id: 'CRM-001', nombre: 'María García Fernández', dni: '12345678A', telefono: '+34 622 481 903', direccion: 'C/ Gran Vía, 48 3ºB', lineas: ['622 481 903', '611 204 771'], satisfaccionRiesgo: 'ok' as const },
-  { id: 'CRM-002', nombre: 'Carlos Ruiz Martín', dni: '87654321B', telefono: '+34 654 892 001', direccion: 'Avda. Castellana, 120 5ºA', lineas: ['654 892 001'], satisfaccionRiesgo: 'critico' as const },
-  { id: 'CRM-003', nombre: 'Empresa Técnica SL', dni: 'B12345678', telefono: '+34 912 345 678', direccion: 'C/ Serrano, 45 2ºD', lineas: ['600 001 001', '600 001 002', '600 001 003'], satisfaccionRiesgo: 'ok' as const },
+export const clientesLista: { id: string; nombre: string; dni: string; telefono: string; direccion: string; lineas: string[]; satisfaccionRiesgo: SatisfaccionRiesgo }[] = [
+  { id: 'CRM-001', nombre: 'María García Fernández', dni: '12345678A', telefono: '+34 622 481 903', direccion: 'C/ Gran Vía, 48 3ºB', lineas: ['622 481 903', '611 204 771'], satisfaccionRiesgo: 'ok' },
+  { id: 'CRM-002', nombre: 'Carlos Ruiz Martín', dni: '87654321B', telefono: '+34 654 892 001', direccion: 'Avda. Castellana, 120 5ºA', lineas: ['654 892 001'], satisfaccionRiesgo: 'critico' },
+  { id: 'CRM-003', nombre: 'Empresa Técnica SL', dni: 'B12345678', telefono: '+34 912 345 678', direccion: 'C/ Serrano, 45 2ºD', lineas: ['600 001 001', '600 001 002', '600 001 003'], satisfaccionRiesgo: 'ok' },
 ]

@@ -143,7 +143,7 @@ export function ProductoDetallePage() {
                   <div className="card-title">Add-ons activos</div>
                   {lineaMovil.addons.map(a => (
                     <div key={a.id} className="table-row">
-                      <div style={{ display: 'flex', align: 'center', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 12 }}>
                           {a.tipo === 'seguro' ? '🛡️' : a.tipo === 'roaming' ? '🌍' : a.tipo === 'datos_extra' ? '📶' : '➕'}
                         </span>
