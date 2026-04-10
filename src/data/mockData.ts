@@ -230,7 +230,7 @@ export function buscarBundles(
         diferencias.push(`2ª línea ilimitada en lugar de ${datosSecundaria}GB`)
       } else {
         score += 8
-        diferencias.push(`2ª línea ${datosBundle === 'ilimitado' ? 'Ilimitado' : String(datosBundle) + 'GB'} (solicitaste ${datosSecundaria === 'ilimitado' ? 'Ilimitado' : String(datosSecundaria) + 'GB'})`)
+        diferencias.push(`2ª línea ${(datosBundle as any) === 'ilimitado' ? 'Ilimitado' : String(datosBundle) + 'GB'} (solicitaste ${(datosSecundaria as any) === 'ilimitado' ? 'Ilimitado' : String(datosSecundaria) + 'GB'})`)
       }
     }
 
