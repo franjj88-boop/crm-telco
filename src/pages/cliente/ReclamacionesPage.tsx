@@ -6,15 +6,32 @@ import { datosCliente } from '../../data/mockData'
 type Tipologia = 'economicas' | 'provision' | 'atencion' | null
 
 // ── MOCK LÍNEA DE TIEMPO ──
-const timelineMock: Record<string, { estado: string; fecha: string; activo: boolean; comunicacion?: string }[]> = {
+const timelineMock: Record<string, {
+  estado: string
+  fecha: string
+  activo: boolean
+  comunicacion?: string
+  fechaEstimada?: string
+  slaInfo?: string
+  canal?: string
+}[]> = {
   'REC-2026-0341': [
-    { estado: 'Abierta', fecha: '05/03/2026', activo: false, comunicacion: 'SMS confirmación apertura' },
-    { estado: 'En CGR', fecha: '06/03/2026', activo: true },
-    { estado: 'Consulta a terceros', fecha: '', activo: false },
-    { estado: 'Resolución', fecha: '', activo: false },
-    { estado: 'Comunicación resolución', fecha: '', activo: false },
-    { estado: 'Gestión económica', fecha: '', activo: false },
-    { estado: 'Cierre final', fecha: '', activo: false },
+    { estado: 'Abierta', fecha: '05/03/2026', activo: false, comunicacion: 'SMS confirmación apertura enviado al cliente', canal: 'SMS' },
+    { estado: 'En revisión CGR', fecha: '06/03/2026', activo: true, slaInfo: '4 días hábiles transcurridos — SLA: 7 días hábiles', fechaEstimada: 'Resolución estimada: 14/03/2026', canal: 'Email previsto al resolver' },
+    { estado: 'Consulta a sistemas origen', fecha: '', activo: false, fechaEstimada: 'Pendiente' },
+    { estado: 'Resolución ARTE', fecha: '', activo: false, fechaEstimada: 'Pendiente' },
+    { estado: 'Comunicación al cliente', fecha: '', activo: false, canal: 'Email + SMS', fechaEstimada: 'Pendiente' },
+    { estado: 'Gestión económica — abono', fecha: '', activo: false, fechaEstimada: 'Próxima factura estimada' },
+    { estado: 'Cierre y archivo', fecha: '', activo: false },
+  ],
+  'REC-2026-0287': [
+    { estado: 'Abierta', fecha: '02/03/2026', activo: false, comunicacion: 'SMS confirmación apertura', canal: 'SMS' },
+    { estado: 'Cobro suspendido', fecha: '02/03/2026', activo: false, comunicacion: 'Bloqueo de cobro factura FAC-2026-02-0014 activado', canal: 'Automático' },
+    { estado: 'En revisión CGR', fecha: '03/03/2026', activo: true, slaInfo: '6 días hábiles transcurridos — SLA: 7 días hábiles ⚠ Próximo vencimiento', fechaEstimada: 'Resolución estimada: 11/03/2026', canal: 'Email previsto al resolver' },
+    { estado: 'Resolución ARTE', fecha: '', activo: false, fechaEstimada: 'Pendiente' },
+    { estado: 'Comunicación al cliente', fecha: '', activo: false, canal: 'Email + SMS' },
+    { estado: 'Gestión económica — abono', fecha: '', activo: false },
+    { estado: 'Cierre y archivo', fecha: '', activo: false },
   ],
 }
 
@@ -66,6 +83,7 @@ export function ReclamacionesPage() {
   // RF-18 — Multi-factura y autocodificación
   const [facturasSel, setFacturasSel] = useState<Set<string>>(new Set())
   const [modoMultiFactura, setModoMultiFactura] = useState(false)
+  const [evidencias, setEvidencias] = useState<{ nombre: string; tipo: string }[]>([])
   const [motivoCodificado, setMotivoCodificado] = useState<{ motivo: string; submotivo: string } | null>(null)
 
   if (!id) return null
@@ -95,9 +113,9 @@ export function ReclamacionesPage() {
     ? datos.reclamaciones.find(r => r.id === reclamacionActiva) || null
     : null
 
-  const timeline = reclamacion ? (timelineMock[reclamacion.id] || []) : []
-  const reaperturas = reclamacion ? (reaperturasMock[reclamacion.id] || []) : []
-  const comunicaciones = reclamacion ? (comunicacionesMock[reclamacion.id] || []) : []
+  const timeline = reclamacion ? (timelineMock[reclamacion.numero] || []) : []
+  const reaperturas = reclamacion ? (reaperturasMock[reclamacion.numero] || []) : []
+  const comunicaciones = reclamacion ? (comunicacionesMock[reclamacion.numero] || []) : []
   const versionData = reaperturas[versionActiva] || null
 
   const ejecutarAccion = (tipo: 'escalar' | 'abono' | 'procedente' | 'improcedente', detalle?: string) => {
@@ -247,7 +265,7 @@ export function ReclamacionesPage() {
                   Motor ARTE · Autocodificación · Multi-factura sin límite
                 </div>
               </div>
-              <button onClick={() => { setMostrarFormNueva(false); setFacturasSel(new Set()); setModoMultiFactura(false); setMotivoCodificado(null) }}
+              <button onClick={() => { setMostrarFormNueva(false); setFacturasSel(new Set()); setModoMultiFactura(false); setMotivoCodificado(null); setEvidencias([]) }}
                 style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-tertiary)', lineHeight: 1 }}>✕</button>
             </div>
 
@@ -328,6 +346,80 @@ export function ReclamacionesPage() {
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Importe reclamado (€)</div>
                 <input className="input" type="number" placeholder="0.00" value={formImporte} onChange={e => setFormImporte(e.target.value)} />
               </div>
+            </div>
+
+            {/* Canal de notificación al cliente + teléfono validado */}
+            <div style={{ marginBottom: 14, padding: '12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-tertiary)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Notificación al cliente
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Canal de resolución</div>
+                  <select className="input" style={{ fontSize: 11 }}>
+                    <option>Email</option>
+                    <option>SMS</option>
+                    <option>Email + SMS</option>
+                    <option>Portal cliente</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Contacto validado</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      className="input"
+                      style={{ fontSize: 11, flex: 1 }}
+                      defaultValue={datos.email}
+                      placeholder="Email o teléfono"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="status-dot status-dot-ok" />
+                <span style={{ fontSize: 10, color: 'var(--color-green-dark)', fontWeight: 600 }}>
+                  Medio de contacto verificado — {datos.email}
+                </span>
+              </div>
+            </div>
+
+            {/* Adjuntar evidencias */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Evidencias adjuntas
+                <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, textTransform: 'none', color: 'var(--color-text-tertiary)' }}>(opcional)</span>
+              </div>
+              <div
+                onClick={() => {
+                  const tipos = ['PDF', 'Imagen', 'Captura']
+                  const nombres = ['factura_cliente.pdf', 'captura_cargo.png', 'extracto_banco.pdf', 'email_promo.png']
+                  const nombre = nombres[Math.floor(Math.random() * nombres.length)]
+                  const tipo = tipos[Math.floor(Math.random() * tipos.length)]
+                  setEvidencias(prev => [...prev, { nombre, tipo }])
+                }}
+                style={{ border: '2px dashed var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', padding: '14px', textAlign: 'center', cursor: 'pointer', background: 'var(--color-background-secondary)', transition: 'all 0.1s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-blue-mid)'; e.currentTarget.style.background = 'var(--color-blue-light)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-secondary)'; e.currentTarget.style.background = 'var(--color-background-secondary)' }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>📎</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>Adjuntar archivo</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>PDF, imagen o captura de pantalla — máx. 5 MB</div>
+              </div>
+              {evidencias.length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {evidencias.map((ev, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12 }}>📄</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-green-dark)' }}>{ev.nombre}</span>
+                        <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-green-border)', color: '#fff', fontWeight: 700 }}>{ev.tipo}</span>
+                      </div>
+                      <button
+                        onClick={() => setEvidencias(prev => prev.filter((_, j) => j !== i))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-tertiary)' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Comentario interno del agente */}
@@ -450,7 +542,7 @@ export function ReclamacionesPage() {
                   : `✓ Abrir reclamación${facturasSel.size > 1 ? ` — ${facturasSel.size} facturas` : ''}`
                 }
               </button>
-              <button onClick={() => { setMostrarFormNueva(false); setFacturasSel(new Set()); setModoMultiFactura(false); setMotivoCodificado(null); setFormComentarioAgente('') }} className="btn-secondary" style={{ fontSize: 12 }}>
+              <button onClick={() => { setMostrarFormNueva(false); setFacturasSel(new Set()); setModoMultiFactura(false); setMotivoCodificado(null); setFormComentarioAgente(''); setEvidencias([]) }} className="btn-secondary" style={{ fontSize: 12 }}>
                 Cancelar
               </button>
             </div>
@@ -564,9 +656,9 @@ export function ReclamacionesPage() {
                         BLOQUEA COBRO
                       </span>
                     )}
-                    {reaperturasMock[r.id] && (
+                    {reaperturasMock[r.numero] && (
                       <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', fontWeight: 600 }}>
-                        {reaperturasMock[r.id].length} versión/es
+                        {reaperturasMock[r.numero].length} versión/es
                       </span>
                     )}
                     <span className={`pill ${estadoPill(r.estado)}`} style={{ fontSize: 10 }}>{r.estado.replace('_', ' ')}</span>
@@ -585,16 +677,16 @@ export function ReclamacionesPage() {
                 </div>
 
                 {/* Estado del timeline resumido */}
-                {timelineMock[r.id] && (
+                {timelineMock[r.numero] && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border-tertiary)', display: 'flex', gap: 4, alignItems: 'center' }}>
-                    {timelineMock[r.id].map((t, i) => (
+                    {timelineMock[r.numero].map((t, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         {i > 0 && <div style={{ width: 16, height: 1, background: t.fecha ? 'var(--color-green-border)' : 'var(--color-border-secondary)' }} />}
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.activo ? 'var(--color-blue)' : t.fecha ? 'var(--color-green-border)' : 'var(--color-border-secondary)', flexShrink: 0 }} />
                       </div>
                     ))}
                     <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>
-                      {timelineMock[r.id].find(t => t.activo)?.estado || 'Sin estado'}
+                      {timelineMock[r.numero].find(t => t.activo)?.estado || 'Sin estado'}
                     </span>
                   </div>
                 )}
@@ -671,41 +763,94 @@ export function ReclamacionesPage() {
             </div>
           )}
 
-          {/* ── LÍNEA DE TIEMPO ── */}
+          {/* ── LÍNEA DE TIEMPO RF-15 ── */}
           {timeline.length > 0 && (
             <div className="card">
-              <div className="card-title">Línea de tiempo</div>
+              <div className="card-title">
+                Línea de tiempo — estados de negocio
+                {(() => {
+                  const estadoActivo = timeline.find(t => t.activo)
+                  return estadoActivo?.slaInfo ? (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: estadoActivo.slaInfo.includes('⚠') ? 'var(--color-red-dark)' : 'var(--color-text-tertiary)', background: estadoActivo.slaInfo.includes('⚠') ? 'var(--color-red-light)' : 'var(--color-background-secondary)', padding: '2px 8px', borderRadius: 'var(--border-radius-full)', border: `1px solid ${estadoActivo.slaInfo.includes('⚠') ? 'var(--color-red-border)' : 'var(--color-border-secondary)'}` }}>
+                      ⏱ {estadoActivo.slaInfo}
+                    </span>
+                  ) : null
+                })()}
+              </div>
               <div style={{ position: 'relative', paddingLeft: 24 }}>
                 <div style={{ position: 'absolute', left: 8, top: 8, bottom: 8, width: 2, background: 'var(--color-border-secondary)', borderRadius: 2 }} />
                 {timeline.map((t, i) => {
                   const completado = !!t.fecha && !t.activo
                   const activo = t.activo
-                  const pendiente = !t.fecha && !t.activo
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < timeline.length - 1 ? 18 : 0, position: 'relative' }}>
-                      <div style={{ width: 16, height: 16, borderRadius: '50%', background: completado ? 'var(--color-green-border)' : activo ? 'var(--color-blue)' : 'var(--color-border-secondary)', border: `2px solid ${completado ? 'var(--color-green-border)' : activo ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: -8, zIndex: 1, position: 'relative' }}>
-                        {completado && <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>✓</span>}
-                        {activo && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'block' }} />}
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < timeline.length - 1 ? 16 : 0, position: 'relative' }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: completado ? 'var(--color-green-border)' : activo ? 'var(--color-blue)' : 'var(--color-background-secondary)', border: `2px solid ${completado ? 'var(--color-green-border)' : activo ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: -9, zIndex: 1, position: 'relative' }}>
+                        {completado && <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>✓</span>}
+                        {activo && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', display: 'block' }} />}
                       </div>
                       <div style={{ flex: 1, paddingBottom: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: 12, fontWeight: activo ? 700 : completado ? 500 : 400, color: activo ? 'var(--color-blue-dark)' : completado ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
-                            {t.estado}
-                            {activo && <span style={{ marginLeft: 8, fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue)', color: '#fff', fontWeight: 700 }}>Actual</span>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 12, fontWeight: activo ? 700 : completado ? 500 : 400, color: activo ? 'var(--color-blue-dark)' : completado ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
+                                {t.estado}
+                              </span>
+                              {activo && (
+                                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue)', color: '#fff', fontWeight: 700 }}>
+                                  ACTUAL
+                                </span>
+                              )}
+                            </div>
+                            {!completado && !activo && t.fechaEstimada && (
+                              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                                {t.fechaEstimada}
+                              </div>
+                            )}
+                            {activo && t.fechaEstimada && (
+                              <div style={{ fontSize: 10, color: 'var(--color-blue-dark)', marginTop: 3, fontWeight: 600 }}>
+                                📅 {t.fechaEstimada}
+                              </div>
+                            )}
+                            {t.canal && (
+                              <div style={{ marginTop: 3, fontSize: 10, color: activo ? 'var(--color-blue-dark)' : completado ? 'var(--color-green-dark)' : 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>{completado ? '✓' : '📤'}</span>
+                                <span>{t.canal}</span>
+                              </div>
+                            )}
+                            {t.comunicacion && (
+                              <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-green-dark)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>💬</span>
+                                <span>{t.comunicacion}</span>
+                              </div>
+                            )}
                           </div>
-                          {t.fecha && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{t.fecha}</span>}
+                          {t.fecha && (
+                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0, marginTop: 2 }}>{t.fecha}</span>
+                          )}
                         </div>
-                        {t.comunicacion && (
-                          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-blue-dark)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span>💬</span>
-                            <span>{t.comunicacion}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )
                 })}
               </div>
+
+              {/* Resumen SLA al pie */}
+              {(() => {
+                const completados = timeline.filter(t => t.fecha && !t.activo).length
+                const total = timeline.length
+                const pct = Math.round((completados / total) * 100)
+                return (
+                  <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--color-border-tertiary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
+                      <span>{completados} de {total} estados completados</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div style={{ height: 4, background: 'var(--color-border-secondary)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--color-green-border)' : 'var(--color-blue)', borderRadius: 2, transition: 'width 0.3s' }} />
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
 

@@ -125,6 +125,11 @@ export function FacturacionPage() {
   const [conceptosSel, setConceptosSel] = useState<Set<string>>(new Set())
   const [accionOk, setAccionOk] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
+  const [modalEnvio, setModalEnvio] = useState(false)
+  const [envioCanal, setEnvioCanal] = useState<'email' | 'sms' | 'portal'>('email')
+  const [envioDestinatario, setEnvioDestinatario] = useState('')
+  const [envioDuplicado, setEnvioDuplicado] = useState(false)
+  const [trazabilidadEnvios, setTrazabilidadEnvios] = useState<{ fecha: string; canal: string; destinatario: string; factura: string }[]>([])
   const [panelAbierto, setPanelAbierto] = useState<'consumos' | 'buscador' | 'simulador' | 'comparativa' | null>(null)
 
   const [modoComparativa, setModoComparativa] = useState(false)
@@ -182,7 +187,24 @@ export function FacturacionPage() {
 
   const ejecutar = (accion: string) => {
     setCargando(true)
-    setTimeout(() => { setCargando(false); setAccionOk(accion); setTimeout(() => setAccionOk(null), 3000) }, 1500)
+    setTimeout(() => { setCargando(false) }, 1500)
+  }
+
+  const confirmarEnvioDuplicado = () => {
+    if (!envioDestinatario.trim()) return
+    setCargando(true)
+    setTimeout(() => {
+      setCargando(false)
+      setTrazabilidadEnvios(prev => [...prev, {
+        fecha: new Date().toLocaleString('es-ES'),
+        canal: envioCanal,
+        destinatario: envioDestinatario,
+        factura: factura?.numero || ''
+      }])
+      setEnvioDuplicado(true)
+      setModalEnvio(false)
+      setTimeout(() => setEnvioDuplicado(false), 4000)
+    }, 1500)
   }
 
   const toggleConcepto = (cid: string) => {
@@ -1242,10 +1264,38 @@ export function FacturacionPage() {
                     <button onClick={() => ejecutar('PDF generado')} disabled={cargando} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
                       📄 PDF
                     </button>
-                    <button onClick={() => ejecutar('Duplicado enviado')} disabled={cargando} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
-                      📧 Enviar
+                    <button
+                      onClick={() => {
+                        setEnvioDestinatario(datos.email || '')
+                        setModalEnvio(true)
+                        setEnvioDuplicado(false)
+                      }}
+                      disabled={cargando}
+                      className="btn-secondary"
+                      style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}>
+                      📧 Enviar duplicado
                     </button>
                   </div>
+
+                  {envioDuplicado && (
+                    <div className="fade-in" style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)', fontSize: 11, color: 'var(--color-green-dark)', fontWeight: 600 }}>
+                      ✓ Duplicado enviado y registrado en trazabilidad
+                    </div>
+                  )}
+
+                  {trazabilidadEnvios.filter(t => t.factura === factura?.numero).length > 0 && (
+                    <div style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-tertiary)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                        Trazabilidad de envíos
+                      </div>
+                      {trazabilidadEnvios.filter(t => t.factura === factura?.numero).map((t, i) => (
+                        <div key={i} style={{ fontSize: 10, color: 'var(--color-text-secondary)', display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span>📤 {t.canal.toUpperCase()} → {t.destinatario}</span>
+                          <span style={{ color: 'var(--color-text-tertiary)' }}>{t.fecha}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {conceptosSel.size > 0 && (
                     <button onClick={() => navigate(`/cliente/${id}/reclamaciones`, { state: { abrirFormulario: true, facturaId: factura?.id, importe: importeSeleccionado, motivo: `Reclamación conceptos: ${factura?.conceptos.filter(c => conceptosSel.has(c.id)).map(c => c.descripcion).join(', ')}` } })} className="btn-danger" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
                       ⚠ Reclamar {conceptosSel.size} concepto/s — {importeSeleccionado.toFixed(2)}€
@@ -1263,6 +1313,66 @@ export function FacturacionPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── MODAL ENVÍO DUPLICADO RF-04 ── */}
+      {modalEnvio && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card fade-in" style={{ width: 420, boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Envío de duplicado</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                  {factura?.numero} · {factura?.periodo}
+                </div>
+              </div>
+              <button onClick={() => setModalEnvio(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Canal de envío</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['email', 'sms', 'portal'] as const).map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setEnvioCanal(c)}
+                    style={{ flex: 1, padding: '8px 6px', border: `1.5px solid ${envioCanal === c ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, borderRadius: 'var(--border-radius-md)', background: envioCanal === c ? 'var(--color-blue-light)' : 'transparent', color: envioCanal === c ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', fontSize: 11, fontWeight: envioCanal === c ? 600 : 400, cursor: 'pointer', textTransform: 'uppercase' }}>
+                    {c === 'email' ? '📧 Email' : c === 'sms' ? '💬 SMS' : '🌐 Portal'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {envioCanal === 'email' ? 'Dirección email' : envioCanal === 'sms' ? 'Número de teléfono' : 'Usuario portal'}
+              </div>
+              <input
+                className="input"
+                placeholder={envioCanal === 'email' ? 'email@ejemplo.com' : envioCanal === 'sms' ? '+34 6XX XXX XXX' : 'Usuario del portal'}
+                value={envioDestinatario}
+                onChange={e => setEnvioDestinatario(e.target.value)}
+                autoFocus
+              />
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                El envío quedará registrado con fecha, hora, canal y destinatario para auditoría
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={confirmarEnvioDuplicado}
+                disabled={cargando || !envioDestinatario.trim()}
+                className="btn-primary"
+                style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                {cargando ? <><span className="spinner spinner-sm" /> Enviando...</> : '📤 Confirmar envío'}
+              </button>
+              <button onClick={() => setModalEnvio(false)} className="btn-secondary" style={{ fontSize: 12 }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

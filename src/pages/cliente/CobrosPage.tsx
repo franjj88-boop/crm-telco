@@ -105,6 +105,35 @@ export function CobrosPage() {
       }
     }
 
+    // Exclusión EGC/buró — requiere deuda saldada
+    if (accionId === 'asnef') {
+      if (cobros.deudaTotal > 0) {
+        return { bloqueada: true, motivo: 'No aplicable — el cliente tiene deuda vencida. La exclusión de buró requiere deuda saldada.' }
+      }
+    }
+
+    // Rehabilitación a crédito — requiere deuda saldada y sin riesgo alto
+    if (accionId === 'rehab') {
+      if (cobros.deudaTotal > 0) {
+        return { bloqueada: true, motivo: 'No aplicable — rehabilitación requiere deuda saldada y mínimo 30 días sin impagos.' }
+      }
+      if (cobros.riesgo === 'alto') {
+        return { bloqueada: true, motivo: 'No aplicable — scoring de riesgo alto. Revisar con especialista de cobros.' }
+      }
+    }
+
+    // EJG — solo disponible si hay deuda vencida
+    if (accionId === 'ejg') {
+      if (cobros.deudaTotal === 0) {
+        return { bloqueada: true, motivo: 'No aplicable — no existe deuda vencida sobre la que iniciar expediente judicial.' }
+      }
+    }
+
+    // Compensación — bloqueada si hay fraccionamiento activo
+    if (accionId === 'compens' && cobros.fraccionamientoActivo) {
+      return { bloqueada: true, motivo: 'No aplicable con fraccionamiento activo — esperar a liquidación de cuotas.' }
+    }
+
     return { bloqueada: false, motivo: '' }
   }
 
@@ -279,6 +308,78 @@ export function CobrosPage() {
           </div>
         ))}
       </div>
+
+      {/* ── HISTÓRICO DE PAGOS ── */}
+      {(() => {
+        const historial = historicoPagosPorCliente[id] || []
+        if (historial.length === 0) return null
+        const conRetraso = historial.filter(h => h.diasRetraso > 0)
+        const sinRetraso = historial.filter(h => h.diasRetraso === 0)
+        const maxRetraso = Math.max(...historial.map(h => h.diasRetraso))
+        return (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div
+              onClick={() => setHistoricoPagosVisible(!historicoPagosVisible)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Histórico de pagos</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{historial.length} facturas saldadas</span>
+                {conRetraso.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', borderRadius: 4, padding: '1px 6px' }}>
+                    {conRetraso.length} con retraso
+                  </span>
+                )}
+                {conRetraso.length === 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--color-green-light)', color: 'var(--color-green-dark)', border: '1px solid var(--color-green-border)', borderRadius: 4, padding: '1px 6px' }}>
+                    Todos en plazo
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                  <span>✓ {sinRetraso.length} a tiempo</span>
+                  {conRetraso.length > 0 && <span style={{ color: 'var(--color-amber-dark)' }}>⚠ {conRetraso.length} con retraso · máx {maxRetraso}d</span>}
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{historicoPagosVisible ? '▲' : '▼'}</span>
+              </div>
+            </div>
+
+            {historicoPagosVisible && (
+              <div style={{ marginTop: 12, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--color-border-secondary)' }}>
+                      {['Período', 'Factura', 'Importe', 'Vencimiento', 'Fecha pago', 'Método', 'Retraso', 'Incidencia'].map(h => (
+                        <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historial.map(h => {
+                      const tarde = h.diasRetraso > 0
+                      return (
+                        <tr key={h.id} style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: tarde ? 'var(--color-amber-light)' : 'transparent' }}>
+                          <td style={{ padding: '5px 8px', fontWeight: 500 }}>{h.periodo}</td>
+                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{h.numeroFactura}</td>
+                          <td style={{ padding: '5px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h.importe.toFixed(2)} €</td>
+                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{h.fechaVencimiento}</td>
+                          <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>{h.fechaPago}</td>
+                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)' }}>{h.metodoPago}</td>
+                          <td style={{ padding: '5px 8px', whiteSpace: 'nowrap', fontWeight: tarde ? 700 : 400, color: tarde ? 'var(--color-amber-dark)' : 'var(--color-green-dark)' }}>
+                            {tarde ? `+${h.diasRetraso}d` : '— en plazo'}
+                          </td>
+                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', fontSize: 11 }}>{h.incidencia || '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {accionOk && (
         <div className="alert alert-ok fade-in">
@@ -529,6 +630,22 @@ export function CobrosPage() {
                   })()}
                 </div>
 
+                {/* Vista multimarca — deuda O2 sin importe */}
+                {cobros.tieneDeudaO2 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Deuda en O2 (otra marca)</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-amber-dark)' }}>
+                        ⚠ Cliente con deuda activa en O2
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                        Importe no visible — consultar con especialista de cobros multimarca
+                      </div>
+                    </div>
+                    <span className="pill pill-warn" style={{ fontSize: 10, flexShrink: 0 }}>O2</span>
+                  </div>
+                )}
+
                 {/* Nuevas contrataciones */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: cobros.riesgo === 'alto' ? 'var(--color-red-light)' : cobros.riesgo === 'medio' ? 'var(--color-amber-light)' : 'var(--color-green-light)', border: `1px solid ${cobros.riesgo === 'alto' ? 'var(--color-red-border)' : cobros.riesgo === 'medio' ? 'var(--color-amber-border)' : 'var(--color-green-border)'}` }}>
                   <div>
@@ -575,77 +692,6 @@ export function CobrosPage() {
         </div>
       )}
 
-      {/* ── HISTÓRICO DE PAGOS ── */}
-      {(() => {
-        const historial = historicoPagosPorCliente[id] || []
-        if (historial.length === 0) return null
-        const conRetraso = historial.filter(h => h.diasRetraso > 0)
-        const sinRetraso = historial.filter(h => h.diasRetraso === 0)
-        const maxRetraso = Math.max(...historial.map(h => h.diasRetraso))
-        return (
-          <div className="card" style={{ marginTop: 12 }}>
-            <div
-              onClick={() => setHistoricoPagosVisible(!historicoPagosVisible)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>Histórico de pagos</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{historial.length} facturas saldadas</span>
-                {conRetraso.length > 0 && (
-                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', borderRadius: 4, padding: '1px 6px' }}>
-                    {conRetraso.length} con retraso
-                  </span>
-                )}
-                {conRetraso.length === 0 && (
-                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--color-green-light)', color: 'var(--color-green-dark)', border: '1px solid var(--color-green-border)', borderRadius: 4, padding: '1px 6px' }}>
-                    Todos en plazo
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--color-text-secondary)' }}>
-                  <span>✓ {sinRetraso.length} a tiempo</span>
-                  {conRetraso.length > 0 && <span style={{ color: 'var(--color-amber-dark)' }}>⚠ {conRetraso.length} con retraso · máx {maxRetraso}d</span>}
-                </div>
-                <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{historicoPagosVisible ? '▲' : '▼'}</span>
-              </div>
-            </div>
-
-            {historicoPagosVisible && (
-              <div style={{ marginTop: 12, overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border-secondary)' }}>
-                      {['Período', 'Factura', 'Importe', 'Vencimiento', 'Fecha pago', 'Método', 'Retraso', 'Incidencia'].map(h => (
-                        <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historial.map(h => {
-                      const tarde = h.diasRetraso > 0
-                      return (
-                        <tr key={h.id} style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: tarde ? 'var(--color-amber-light)' : 'transparent' }}>
-                          <td style={{ padding: '5px 8px', fontWeight: 500 }}>{h.periodo}</td>
-                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{h.numeroFactura}</td>
-                          <td style={{ padding: '5px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h.importe.toFixed(2)} €</td>
-                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{h.fechaVencimiento}</td>
-                          <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>{h.fechaPago}</td>
-                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)' }}>{h.metodoPago}</td>
-                          <td style={{ padding: '5px 8px', whiteSpace: 'nowrap', fontWeight: tarde ? 700 : 400, color: tarde ? 'var(--color-amber-dark)' : 'var(--color-green-dark)' }}>
-                            {tarde ? `+${h.diasRetraso}d` : '— en plazo'}
-                          </td>
-                          <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', fontSize: 11 }}>{h.incidencia || '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )
-      })()}
     </>
   )
 }
