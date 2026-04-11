@@ -67,6 +67,8 @@ export function ConsumosPage() {
   const [soloAnomalos, setSoloAnomalos] = useState(false)
   const [consumoSel, setConsumoSel] = useState<Consumo | null>(null)
   const [vistaResumen, setVistaResumen] = useState(false)
+  const [consumosSel, setConsumosSel] = useState<Set<string>>(new Set())
+  const [modoMultisel, setModoMultisel] = useState(false)
 
   // Estados acción reclamación
   const [mostrarFormRec, setMostrarFormRec] = useState(false)
@@ -147,12 +149,25 @@ export function ConsumosPage() {
             Roaming · Números 900/800 · Emoción · Otros · Facturados y en curso
           </div>
         </div>
-        <button
-          onClick={() => { setVistaResumen(!vistaResumen); setConsumoSel(null) }}
-          className="btn-secondary"
-          style={{ fontSize: 11 }}>
-          {vistaResumen ? '☰ Vista lista' : '▦ Vista resumen'}
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => { setModoMultisel(!modoMultisel); setConsumosSel(new Set()) }}
+            style={{
+              fontSize: 11, padding: '4px 12px', borderRadius: 'var(--border-radius-full)',
+              border: `1.5px solid ${modoMultisel ? 'var(--color-purple)' : 'var(--color-border-secondary)'}`,
+              background: modoMultisel ? 'var(--color-purple-light)' : 'none',
+              color: modoMultisel ? 'var(--color-purple)' : 'var(--color-text-secondary)',
+              cursor: 'pointer', fontWeight: modoMultisel ? 600 : 400
+            }}>
+            {modoMultisel ? `✓ Seleccionando (${consumosSel.size})` : '☑ Selección múltiple'}
+          </button>
+          <button
+            onClick={() => { setVistaResumen(!vistaResumen); setConsumoSel(null) }}
+            className="btn-secondary"
+            style={{ fontSize: 11 }}>
+            {vistaResumen ? '☰ Vista lista' : '▦ Vista resumen'}
+          </button>
+        </div>
       </div>
 
       {consumos.length === 0 ? (
@@ -245,18 +260,52 @@ export function ConsumosPage() {
                   return (
                     <div
                       key={c.id}
-                      onClick={() => { setConsumoSel(c); setMostrarFormRec(false); setRecAbierta(false); setDerivado(false); setBloqueado(false) }}
+                      onClick={() => {
+                        if (modoMultisel) {
+                          if (!c.facturado) return
+                          const s = new Set(consumosSel)
+                          s.has(c.id) ? s.delete(c.id) : s.add(c.id)
+                          setConsumosSel(s)
+                        } else {
+                          setConsumoSel(c)
+                          setMostrarFormRec(false)
+                          setRecAbierta(false)
+                          setDerivado(false)
+                          setBloqueado(false)
+                        }
+                      }}
                       style={{
                         padding: '10px 14px',
                         borderRadius: 'var(--border-radius-md)',
-                        border: `1px solid ${seleccionado ? col.border : 'var(--color-border-tertiary)'}`,
-                        background: seleccionado ? col.bg : 'var(--color-background-primary)',
+                        border: `1px solid ${modoMultisel && consumosSel.has(c.id) ? 'var(--color-purple)' : seleccionado ? col.border : 'var(--color-border-tertiary)'}`,
+                        background: modoMultisel && consumosSel.has(c.id) ? 'var(--color-purple-light)' : seleccionado ? col.bg : 'var(--color-background-primary)',
                         cursor: 'pointer',
                         borderLeft: `4px solid ${col.border}`,
                         transition: 'all 0.15s',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        {modoMultisel && (
+                          <div
+                            onClick={e => {
+                              e.stopPropagation()
+                              if (!c.facturado) return
+                              const s = new Set(consumosSel)
+                              s.has(c.id) ? s.delete(c.id) : s.add(c.id)
+                              setConsumosSel(s)
+                            }}
+                            style={{
+                              width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                              border: `2px solid ${!c.facturado ? 'var(--color-border-tertiary)' : consumosSel.has(c.id) ? 'var(--color-purple)' : 'var(--color-border-secondary)'}`,
+                              background: !c.facturado ? 'var(--color-background-secondary)' : consumosSel.has(c.id) ? 'var(--color-purple)' : 'white',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: c.facturado ? 'pointer' : 'not-allowed',
+                              opacity: c.facturado ? 1 : 0.4,
+                              marginRight: 8, marginTop: 2,
+                            }}>
+                            {consumosSel.has(c.id) && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>✓</span>}
+                          </div>
+                        )}
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                             <span style={{ fontSize: 10, fontWeight: 700, color: col.color }}>
@@ -294,7 +343,7 @@ export function ConsumosPage() {
                           {(c.descripcion.toLowerCase().includes('roaming') ||
                             c.descripcion.toLowerCase().includes('900') ||
                             c.descripcion.toLowerCase().includes('800') ||
-                            c.importe > 5) && (
+                            c.importe > 5) && c.facturado && (
                             <button
                               onClick={e => { e.stopPropagation(); navigate(`/cliente/${id}/reclamaciones`, {
                                 state: {
@@ -317,6 +366,124 @@ export function ConsumosPage() {
                   )
                 })}
               </div>
+
+              {/* Panel reclamación multi-consumo */}
+              {modoMultisel && consumosSel.size > 0 && (() => {
+                const consumosSeleccionados = consumos.filter(c => consumosSel.has(c.id))
+                const importeTotal = consumosSeleccionados.reduce((a, c) => a + c.importe, 0)
+                const facturasAfectadas = [...new Set(
+                  consumosSeleccionados
+                    .filter(c => c.facturado && c.facturaId)
+                    .map(c => c.facturaId!)
+                )]
+                const facturasDetalle = datos.facturas.filter(f => facturasAfectadas.includes(f.id))
+                const hayEnVuelo = consumosSeleccionados.some(c => !c.facturado)
+                const categoriasMulti = [...new Set(consumosSeleccionados.map(c => c.categoria))]
+
+                return (
+                  <div className="card fade-in" style={{
+                    border: '1.5px solid var(--color-purple-border)',
+                    background: 'var(--color-purple-light)',
+                    marginBottom: 8,
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-purple)', marginBottom: 10 }}>
+                      ☑ Reclamación multi-consumo — {consumosSel.size} concepto{consumosSel.size > 1 ? 's' : ''} seleccionado{consumosSel.size > 1 ? 's' : ''}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                      {consumosSeleccionados.map(c => (
+                        <div key={c.id} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '5px 8px', borderRadius: 'var(--border-radius-md)',
+                          background: 'rgba(255,255,255,0.65)',
+                          border: '1px solid var(--color-purple-border)',
+                          fontSize: 11,
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 500, color: 'var(--color-purple)' }}>{c.descripcion}</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                              {c.linea} · {c.fechaInicio}
+                              {!c.facturado && <span style={{ marginLeft: 6, fontWeight: 700, color: 'var(--color-amber-dark)' }}>EN VUELO</span>}
+                            </div>
+                          </div>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-purple)' }}>
+                            {c.importe.toFixed(2)}€
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.5)', border: '1px solid var(--color-purple-border)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-purple)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {facturasDetalle.length} factura{facturasDetalle.length > 1 ? 's' : ''} vinculada{facturasDetalle.length > 1 ? 's' : ''}
+                        {hayEnVuelo && <span style={{ marginLeft: 6, color: 'var(--color-amber-dark)' }}>+ 1 consumo en vuelo</span>}
+                      </div>
+                      {hayEnVuelo && (
+                        <div style={{ padding: '6px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 10, color: 'var(--color-amber-dark)', marginBottom: 8 }}>
+                          ⚠ Los consumos en vuelo no se incluyen — aún no están facturados. Se registrarán como aviso para seguimiento.
+                        </div>
+                      )}
+                      {facturasDetalle.map(f => (
+                        <div key={f.id} style={{
+                          display: 'flex', justifyContent: 'space-between',
+                          fontSize: 11, color: 'var(--color-purple)', padding: '2px 0',
+                          borderBottom: '1px solid rgba(255,255,255,0.4)',
+                        }}>
+                          <span>{f.periodo} · {f.numero}</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                            {consumosSeleccionados.filter(c => c.facturaId === f.id).reduce((a, c) => a + c.importe, 0).toFixed(2)}€
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '10px 12px', borderRadius: 'var(--border-radius-md)',
+                      background: 'rgba(255,255,255,0.8)', border: '1.5px solid var(--color-purple-border)',
+                      marginBottom: 12,
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--color-purple)' }}>Importe total a reclamar</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                          Categoría{categoriasMulti.length > 1 ? 's' : ''}: {categoriasMulti.map(cat => labelCategoria[cat]).join(', ')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-purple)' }}>
+                        {importeTotal.toFixed(2)}€
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          navigate(`/cliente/${id}/reclamaciones`, {
+                            state: {
+                              abrirFormulario: true,
+                              desdeConsumo: true,
+                              multiConsumo: true,
+                              consumosIds: [...consumosSel],
+                              importeTotal,
+                              facturasIds: facturasAfectadas,
+                              motivo: `Reclamación emoción: ${[...new Set(consumosSeleccionados.map(c => c.descripcion))].join(', ')}`,
+                              tipoPredef: 'emocion',
+                            }
+                          })
+                        }}
+                        className="btn-primary"
+                        style={{ flex: 2, justifyContent: 'center', fontSize: 12 }}>
+                        Abrir reclamación — {importeTotal.toFixed(2)}€ · {facturasDetalle.length} factura{facturasDetalle.length > 1 ? 's' : ''}
+                      </button>
+                      <button
+                        onClick={() => { setConsumosSel(new Set()); setModoMultisel(false) }}
+                        className="btn-secondary"
+                        style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Panel detalle */}
               {consumoSel ? (

@@ -122,7 +122,6 @@ export function FacturacionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [facturaActiva, setFacturaActiva] = useState<string | null>(null)
-  const [conceptosSel, setConceptosSel] = useState<Set<string>>(new Set())
   const [accionOk, setAccionOk] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
   const [modalEnvio, setModalEnvio] = useState(false)
@@ -163,6 +162,13 @@ export function FacturacionPage() {
   const [seleccionEnvio, setSeleccionEnvio] = useState<Set<string>>(new Set())
   const [modoEnvioMultiple, setModoEnvioMultiple] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [conceptosReclamacion, setConceptosReclamacion] = useState<{
+    conceptoId: string
+    facturaId: string
+    facturaPeriodo: string
+    descripcion: string
+    importe: number
+  }[]>([])
 
   const mostrarConsumos = panelAbierto === 'consumos'
   const modoBuscador = panelAbierto === 'buscador'
@@ -180,7 +186,6 @@ export function FacturacionPage() {
   const seleccionarFactura = (fid: string) => {
     if (fid === factura?.id) return
     setCargandoDetalle(true)
-    setConceptosSel(new Set())
     setModoVistaFactura(false)
     setConceptoDrilldown(null)
     setTimeout(() => { setFacturaActiva(fid); setCargandoDetalle(false) }, 400)
@@ -207,16 +212,6 @@ export function FacturacionPage() {
       setTimeout(() => setEnvioDuplicado(false), 4000)
     }, 1500)
   }
-
-  const toggleConcepto = (cid: string) => {
-    const s = new Set(conceptosSel)
-    if (s.has(cid)) s.delete(cid); else s.add(cid)
-    setConceptosSel(s)
-  }
-
-  const importeSeleccionado = factura?.conceptos
-    .filter(c => conceptosSel.has(c.id))
-    .reduce((a, c) => a + c.importe, 0) || 0
 
   const estadoPill = (e: string) => {
     if (e === 'pagada') return 'pill-ok'
@@ -504,7 +499,7 @@ export function FacturacionPage() {
                 return (
                   <div
                     key={f.id}
-                    onClick={() => { seleccionarFactura(f.id); setPanelAbierto(null); setConceptosSel(new Set()) }}
+                    onClick={() => { seleccionarFactura(f.id); setPanelAbierto(null); setConceptosReclamacion([]) }}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', border: `1px solid ${tieneRec ? 'var(--color-red-border)' : 'var(--color-border-tertiary)'}`, borderLeft: `3px solid ${tieneRec ? 'var(--color-red-mid)' : f.estado === 'pagada' ? 'var(--color-green-border)' : 'var(--color-amber-mid)'}`, borderRadius: 'var(--border-radius-md)', cursor: 'pointer', background: 'var(--color-background-primary)', transition: 'all 0.1s' }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1444,18 +1439,48 @@ export function FacturacionPage() {
                       </div>
                     )}
                     {factura.conceptos.map(c => (
-                      <div key={c.id} onClick={() => c.anomalo && toggleConcepto(c.id)}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: 'var(--border-radius-md)', border: `1px solid ${conceptosSel.has(c.id) ? 'var(--color-red-border)' : c.anomalo ? 'var(--color-amber-border)' : 'var(--color-border-tertiary)'}`, background: conceptosSel.has(c.id) ? 'var(--color-red-light)' : c.anomalo ? 'var(--color-amber-light)' : 'transparent', cursor: c.anomalo ? 'pointer' : 'default', transition: 'all 0.1s' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {c.anomalo && <input type="checkbox" checked={conceptosSel.has(c.id)} readOnly style={{ cursor: 'pointer', accentColor: 'var(--color-red-mid)' }} />}
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: c.anomalo ? 600 : 400, color: c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-text-primary)' }}>
-                              {c.anomalo && '⚠ '}{c.descripcion}
-                            </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'capitalize' }}>{c.tipo}</div>
+                      <div key={c.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 12px', borderRadius: 'var(--border-radius-md)',
+                        background: c.anomalo ? 'var(--color-amber-light)' : 'transparent',
+                        border: c.anomalo ? '1px solid var(--color-amber-border)' : 'none',
+                        marginBottom: 4,
+                      }}>
+                        {c.anomalo && (
+                          <div
+                            onClick={() => {
+                              const yaEsta = conceptosReclamacion.some(x => x.conceptoId === c.id)
+                              if (yaEsta) {
+                                setConceptosReclamacion(prev => prev.filter(x => x.conceptoId !== c.id))
+                              } else {
+                                setConceptosReclamacion(prev => [...prev, {
+                                  conceptoId: c.id,
+                                  facturaId: facturaActiva!,
+                                  facturaPeriodo: factura?.periodo || '',
+                                  descripcion: c.descripcion,
+                                  importe: c.importe,
+                                }])
+                              }
+                            }}
+                            style={{
+                              width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                              border: `2px solid ${conceptosReclamacion.some(x => x.conceptoId === c.id) ? 'var(--color-amber-dark)' : 'var(--color-amber-border)'}`,
+                              background: conceptosReclamacion.some(x => x.conceptoId === c.id) ? 'var(--color-amber-dark)' : 'white',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}>
+                            {conceptosReclamacion.some(x => x.conceptoId === c.id) && (
+                              <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>✓</span>
+                            )}
                           </div>
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: c.anomalo ? 600 : 400, color: c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-text-primary)' }}>
+                            {c.anomalo && '⚠ '}{c.descripcion}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1, textTransform: 'capitalize' }}>{c.tipo}</div>
                         </div>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: c.importe < 0 ? 'var(--color-green)' : c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-text-primary)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: c.importe < 0 ? 'var(--color-green)' : c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-text-primary)', flexShrink: 0 }}>
                           {c.importe > 0 ? '+' : ''}{c.importe.toFixed(2)}€
                         </span>
                       </div>
@@ -1505,37 +1530,104 @@ export function FacturacionPage() {
                       ))}
                     </div>
                   )}
-                  {conceptosSel.size > 0 && (() => {
-                    const masivaActiva = datos.averias.some(a => a.masiva && a.estado !== 'resuelta')
-                    const reclamacionDuplicada = datos.reclamaciones.some(r =>
-                      r.facturaId === factura?.id && (r.estado === 'abierta' || r.estado === 'en_gestion')
-                    )
-                    if (masivaActiva) return (
-                      <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
-                        📡 Incidencia masiva activa — reclamación económica bloqueada hasta resolución de la masiva.
-                      </div>
-                    )
-                    if (reclamacionDuplicada) return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ padding: '8px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', fontSize: 11, color: 'var(--color-blue-dark)' }}>
-                          ℹ Ya existe una reclamación activa sobre esta factura — no se puede duplicar.
-                        </div>
-                        <button onClick={() => navigate(`/cliente/${id}/reclamaciones`)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
-                          Ver reclamación activa →
-                        </button>
-                      </div>
-                    )
-                    return (
-                      <button onClick={() => navigate(`/cliente/${id}/reclamaciones`, { state: { abrirFormulario: true, facturaId: factura?.id, importe: importeSeleccionado, motivo: `Reclamación conceptos: ${factura?.conceptos.filter(c => conceptosSel.has(c.id)).map(c => c.descripcion).join(', ')}` } })} className="btn-danger" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
-                        ⚠ Reclamar {conceptosSel.size} concepto/s — {importeSeleccionado.toFixed(2)}€
-                      </button>
-                    )
-                  })()}
                   {factura.estado === 'vencida' && (
                     <button onClick={() => navigate(`/cliente/${id}/cobros`)} className="btn-danger" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
                       💳 Gestionar cobro
                     </button>
                   )}
+                  {/* Panel acumulador reclamación multi-concepto */}
+                  {conceptosReclamacion.length > 0 && (() => {
+                    const importeTotal = conceptosReclamacion.reduce((a, c) => a + c.importe, 0)
+                    const facturasAfectadas = [...new Map(
+                      conceptosReclamacion.map(c => [c.facturaId, c.facturaPeriodo])
+                    ).entries()]
+
+                    return (
+                      <div className="fade-in" style={{
+                        border: '1.5px solid var(--color-amber-border)',
+                        borderRadius: 'var(--border-radius-lg)',
+                        background: 'var(--color-amber-light)',
+                        padding: '12px 14px',
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 10 }}>
+                          ⚠ Reclamación en construcción — {conceptosReclamacion.length} concepto{conceptosReclamacion.length > 1 ? 's' : ''} seleccionado{conceptosReclamacion.length > 1 ? 's' : ''}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                          {conceptosReclamacion.map(c => (
+                            <div key={c.conceptoId} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '5px 8px', borderRadius: 'var(--border-radius-md)',
+                              background: 'rgba(255,255,255,0.65)',
+                              border: '1px solid var(--color-amber-border)',
+                              fontSize: 11,
+                            }}>
+                              <div>
+                                <div style={{ fontWeight: 500, color: 'var(--color-amber-dark)' }}>{c.descripcion}</div>
+                                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{c.facturaPeriodo}</div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-amber-dark)' }}>
+                                  {c.importe.toFixed(2)}€
+                                </span>
+                                <button
+                                  onClick={() => setConceptosReclamacion(prev => prev.filter(x => x.conceptoId !== c.conceptoId))}
+                                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ padding: '6px 10px', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,255,255,0.5)', border: '1px solid var(--color-amber-border)', marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {facturasAfectadas.length} factura{facturasAfectadas.length > 1 ? 's' : ''} vinculada{facturasAfectadas.length > 1 ? 's' : ''}
+                          </div>
+                          {facturasAfectadas.map(([fId, fPeriodo]) => (
+                            <div key={fId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-amber-dark)', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
+                              <span>{fPeriodo} · {fId}</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                                {conceptosReclamacion.filter(c => c.facturaId === fId).reduce((a, c) => a + c.importe, 0).toFixed(2)}€
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-amber-dark)' }}>Total a reclamar</span>
+                          <span style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-amber-dark)' }}>
+                            {importeTotal.toFixed(2)}€
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => navigate(`/cliente/${id}/reclamaciones`, {
+                              state: {
+                                abrirFormulario: true,
+                                desdeFactura: true,
+                                multiConsumo: true,
+                                importeTotal,
+                                facturasIds: facturasAfectadas.map(([fId]) => fId),
+                                motivo: `Reclamación conceptos: ${conceptosReclamacion.map(c => c.descripcion).join(', ')}`,
+                                tipoPredef: 'economica',
+                              }
+                            })}
+                            className="btn-primary"
+                            style={{ flex: 2, justifyContent: 'center', fontSize: 12, background: 'var(--color-amber-dark)', borderColor: 'var(--color-amber-dark)' }}>
+                            Abrir reclamación — {importeTotal.toFixed(2)}€ · {facturasAfectadas.length} factura{facturasAfectadas.length > 1 ? 's' : ''}
+                          </button>
+                          <button
+                            onClick={() => setConceptosReclamacion([])}
+                            className="btn-secondary"
+                            style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                            Limpiar
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })()}
                   <button onClick={() => { setPanelAbierto('comparativa'); setModoComparativa(true) }} className="btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}>
                     ⇄ Comparar con otra factura →
                   </button>
@@ -1605,6 +1697,7 @@ export function FacturacionPage() {
           </div>
         </div>
       )}
+
     </>
   )
 }

@@ -56,20 +56,26 @@ const iconoTipo = (tipo: string) => ({ SMS: '💬', Email: '📧', Llamada: '�
 export function ReclamacionesPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const stateInicial = location.state as any
 
-  const [vista, setVista] = useState<'home' | 'lista' | 'detalle'>('home')
+  const [vista, setVista] = useState<'home' | 'lista' | 'detalle'>(() => {
+    if (stateInicial?.abrirFormulario) return 'nueva' as any
+    return 'home'
+  })
   const [tipologia, setTipologia] = useState<Tipologia>(null)
   const [reclamacionActiva, setReclamacionActiva] = useState<string | null>(null)
   const [versionActiva, setVersionActiva] = useState<number>(0)
   const [cargando, setCargando] = useState(false)
   const [abriendo, setAbriendo] = useState(false)
   const [nuevaAbierta, setNuevaAbierta] = useState(false)
-  const [mostrarFormNueva, setMostrarFormNueva] = useState(false)
-  const [formMotivo, setFormMotivo] = useState('')
+  const [mostrarFormNueva, setMostrarFormNueva] = useState(!!stateInicial?.abrirFormulario)
+  const [formMotivo, setFormMotivo] = useState(stateInicial?.motivo || '')
   const [formCategoria, setFormCategoria] = useState<'economica' | 'provision' | 'atencion'>('economica')
   const [formCanal, setFormCanal] = useState('Teléfono')
-  const [formImporte, setFormImporte] = useState('')
-  const [formFactura, setFormFactura] = useState('')
+  const [formImporte, setFormImporte] = useState(stateInicial?.importeTotal?.toString() || '')
+  const [formFactura, setFormFactura] = useState(stateInicial?.facturasIds?.[0] || '')
+  const [facturasMulti, setFacturasMulti] = useState<string[]>(stateInicial?.facturasIds || [])
   const [formComentarioAgente, setFormComentarioAgente] = useState('')
   const [mostrarComms, setMostrarComms] = useState<string | null>(null)
   const [filtroLinea, setFiltroLinea] = useState<string>('todas')
@@ -84,33 +90,15 @@ export function ReclamacionesPage() {
   const [accionEjecutada, setAccionEjecutada] = useState<{ tipo: string; detalle: string } | null>(null)
 
   // RF-18 — Multi-factura y autocodificación
-  const [facturasSel, setFacturasSel] = useState<Set<string>>(new Set())
-  const [modoMultiFactura, setModoMultiFactura] = useState(false)
+  const [modoMultiFactura, setModoMultiFactura] = useState(
+    (stateInicial?.facturasIds?.length || 0) > 1
+  )
   const [evidencias, setEvidencias] = useState<{ nombre: string; tipo: string }[]>([])
   const [motivoCodificado, setMotivoCodificado] = useState<{ motivo: string; submotivo: string } | null>(null)
 
   if (!id) return null
   const datos = datosCliente[id]
   if (!datos) return null
-
-  // RF-10 — Abrir formulario desde navegación externa
-  const location = useLocation()
-  useState(() => {
-    if (location.state?.abrirFormulario) {
-      setMostrarFormNueva(true)
-      setNuevaAbierta(false)
-      if (location.state?.facturaId) {
-        setFormFactura(location.state.facturaId)
-        setModoMultiFactura(false)
-      }
-      if (location.state?.importe) {
-        setFormImporte(location.state.importe.toFixed(2))
-      }
-      if (location.state?.motivo) {
-        setFormMotivo(location.state.motivo)
-      }
-    }
-  })
 
   const reclamacion = reclamacionActiva
     ? datos.reclamaciones.find(r => r.id === reclamacionActiva) || null
@@ -285,7 +273,7 @@ export function ReclamacionesPage() {
                   Motor ARTE · Autocodificación · Multi-factura sin límite
                 </div>
               </div>
-              <button onClick={() => { setMostrarFormNueva(false); setFacturasSel(new Set()); setModoMultiFactura(false); setMotivoCodificado(null); setEvidencias([]) }}
+              <button onClick={() => { setMostrarFormNueva(false); setFacturasMulti([]); setModoMultiFactura(false); setMotivoCodificado(null); setEvidencias([]) }}
                 style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-tertiary)', lineHeight: 1 }}>✕</button>
             </div>
 
@@ -522,94 +510,92 @@ export function ReclamacionesPage() {
               />
             </div>
 
-            {/* RF-18 — Selección multi-factura */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {/* FACTURAS VINCULADAS */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Facturas vinculadas
-                  {facturasSel.size > 0 && (
-                    <span style={{ marginLeft: 8, fontSize: 10, padding: '1px 6px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-blue)', color: '#fff', fontWeight: 700 }}>
-                      {facturasSel.size} seleccionada/s
-                    </span>
-                  )}
                 </div>
-                <button
-                  onClick={() => setModoMultiFactura(!modoMultiFactura)}
-                  style={{ fontSize: 10, padding: '3px 8px', borderRadius: 'var(--border-radius-full)', border: `1.5px solid ${modoMultiFactura ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: modoMultiFactura ? 'var(--color-blue-light)' : 'none', color: modoMultiFactura ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: modoMultiFactura ? 600 : 400 }}>
-                  {modoMultiFactura ? '✓ Multi-factura activo' : 'Activar multi-factura'}
-                </button>
+                {!modoMultiFactura && (
+                  <button onClick={() => setModoMultiFactura(true)} className="btn-ghost" style={{ fontSize: 10 }}>
+                    Activar multi-factura
+                  </button>
+                )}
               </div>
 
-              {!modoMultiFactura ? (
-                <select className="input" value={formFactura} onChange={e => setFormFactura(e.target.value)}>
-                  <option value="">— Sin factura vinculada —</option>
-                  {datos.facturas.map(f => (
-                    <option key={f.id} value={f.id}>{f.periodo} · {f.numero} · {f.importe.toFixed(2)}€</option>
-                  ))}
-                </select>
-              ) : (
+              {modoMultiFactura ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
-                    Selecciona todas las facturas afectadas — sin límite de consecutividad ni número máximo
-                  </div>
-                  <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {datos.facturas.map(f => {
-                      const sel = facturasSel.has(f.id)
-                      const tieneAnomalia = f.conceptos.some((c: any) => c.anomalo)
-                      return (
-                        <div key={f.id}
-                          onClick={() => {
-                            const s = new Set(facturasSel)
-                            if (s.has(f.id)) s.delete(f.id); else s.add(f.id)
-                            setFacturasSel(s)
-                          }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: `1.5px solid ${sel ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-md)', cursor: 'pointer', background: sel ? 'var(--color-blue-light)' : 'transparent', transition: 'all 0.1s' }}>
-                          <div style={{ width: 16, height: 16, borderRadius: 3, border: `2px solid ${sel ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`, background: sel ? 'var(--color-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {sel && <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>✓</span>}
+                  {datos.facturas.filter(f => !(f as any).esRectificativa).map(f => {
+                    const seleccionada = facturasMulti.includes(f.id)
+                    return (
+                      <div key={f.id}
+                        onClick={() => {
+                          setFacturasMulti(prev =>
+                            prev.includes(f.id) ? prev.filter(x => x !== f.id) : [...prev, f.id]
+                          )
+                        }}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 12px', borderRadius: 'var(--border-radius-md)', cursor: 'pointer',
+                          border: `1.5px solid ${seleccionada ? 'var(--color-blue)' : 'var(--color-border-tertiary)'}`,
+                          background: seleccionada ? 'var(--color-blue-light)' : 'var(--color-background-primary)',
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                            border: `2px solid ${seleccionada ? 'var(--color-blue)' : 'var(--color-border-secondary)'}`,
+                            background: seleccionada ? 'var(--color-blue)' : 'white',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {seleccionada && <span style={{ fontSize: 10, color: 'white', fontWeight: 700 }}>✓</span>}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: sel ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: seleccionada ? 600 : 400, color: seleccionada ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>
                               {f.periodo} · {f.numero}
                             </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
-                              Vence {f.fechaVencimiento} · {f.estado}
-                              {tieneAnomalia && <span style={{ marginLeft: 6, color: 'var(--color-amber-dark)', fontWeight: 600 }}>⚠ anomalía</span>}
-                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{f.estado}</div>
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: sel ? 'var(--color-blue-dark)' : 'var(--color-text-primary)', flexShrink: 0 }}>
-                            {f.importe.toFixed(2)}€
-                          </span>
                         </div>
-                      )
-                    })}
-                  </div>
-
-                  {facturasSel.size > 0 && (
-                    <div className="fade-in" style={{ padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-green-light)', border: '1px solid var(--color-green-border)', marginTop: 4 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-green-dark)', marginBottom: 4 }}>
-                        📋 Expediente único — {facturasSel.size} factura/s vinculadas
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-green-dark)' }}>
-                        <span>{datos.facturas.filter(f => facturasSel.has(f.id)).map(f => f.periodo).join(' · ')}</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                          {datos.facturas.filter(f => facturasSel.has(f.id)).reduce((a, f) => a + f.importe, 0).toFixed(2)}€ total
+                        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: seleccionada ? 'var(--color-blue-dark)' : 'var(--color-text-secondary)' }}>
+                          {f.importe.toFixed(2)} €
                         </span>
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-green-dark)', marginTop: 4, opacity: 0.8 }}>
-                        Se creará un único ID de reclamación con todas las facturas incluidas — sin fragmentación por consecutividad
-                      </div>
+                    )
+                  })}
+                  {facturasMulti.length > 1 && (
+                    <div style={{ padding: '6px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', fontSize: 11, color: 'var(--color-blue-dark)', fontWeight: 600 }}>
+                      {facturasMulti.length} facturas seleccionadas · Total importe reclamado: {
+                        datos.facturas.filter(f => facturasMulti.includes(f.id))
+                          .reduce((a, f) => {
+                            const importeAnomalo = (f.conceptos || []).filter((c: any) => c.anomalo).reduce((s: number, c: any) => s + c.importe, 0)
+                            return a + importeAnomalo
+                          }, 0).toFixed(2)
+                      } €
                     </div>
                   )}
                 </div>
+              ) : (
+                <select
+                  value={formFactura}
+                  onChange={e => setFormFactura(e.target.value)}
+                  className="input"
+                  style={{ width: '100%' }}>
+                  <option value="">— Sin factura vinculada —</option>
+                  {datos.facturas.filter(f => !(f as any).esRectificativa).map(f => (
+                    <option key={f.id} value={f.id}>
+                      {f.periodo} · {f.numero} · {f.importe.toFixed(2)}€
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
 
             {/* Auditoría ARTE */}
-            {(motivoCodificado || facturasSel.size > 1 || formComentarioAgente.trim()) && (
+            {(motivoCodificado || facturasMulti.length > 1 || formComentarioAgente.trim()) && (
               <div style={{ marginBottom: 14, padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', border: '1px solid var(--color-border-tertiary)', fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                 <div style={{ fontWeight: 700, marginBottom: 3, color: 'var(--color-text-secondary)' }}>📊 Trazabilidad ARTE — para auditoría y reporting</div>
                 {motivoCodificado && <div>Motivo autocodificado: {motivoCodificado.motivo} / {motivoCodificado.submotivo}</div>}
-                {facturasSel.size > 1 && <div>Expediente multi-factura: {facturasSel.size} facturas · {datos.facturas.filter(f => facturasSel.has(f.id)).reduce((a, f) => a + f.importe, 0).toFixed(2)}€ total en disputa</div>}
+                {facturasMulti.length > 1 && <div>Expediente multi-factura: {facturasMulti.length} facturas · {datos.facturas.filter(f => facturasMulti.includes(f.id)).reduce((a, f) => a + f.importe, 0).toFixed(2)}€ total en disputa</div>}
                 <div>Canal: {formCanal} · Fecha apertura: {new Date().toLocaleDateString('es-ES')}</div>
                 {formComentarioAgente.trim() && <div style={{ marginTop: 3 }}>Comentario agente: {formComentarioAgente.trim()}</div>}
               </div>
@@ -624,10 +610,10 @@ export function ReclamacionesPage() {
                 style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
                 {abriendo
                   ? <><span className="spinner spinner-sm" /> Abriendo reclamación...</>
-                  : `✓ Abrir reclamación${facturasSel.size > 1 ? ` — ${facturasSel.size} facturas` : ''}`
+                  : `✓ Abrir reclamación${facturasMulti.length > 1 ? ` — ${facturasMulti.length} facturas` : ''}`
                 }
               </button>
-              <button onClick={() => { setMostrarFormNueva(false); setFacturasSel(new Set()); setModoMultiFactura(false); setMotivoCodificado(null); setFormComentarioAgente(''); setEvidencias([]) }} className="btn-secondary" style={{ fontSize: 12 }}>
+              <button onClick={() => { setMostrarFormNueva(false); setFacturasMulti([]); setModoMultiFactura(false); setMotivoCodificado(null); setFormComentarioAgente(''); setEvidencias([]) }} className="btn-secondary" style={{ fontSize: 12 }}>
                 Cancelar
               </button>
             </div>

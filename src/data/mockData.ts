@@ -847,6 +847,85 @@ export const datosCliente: Record<string, Cliente> = {
         estado: 'pendiente',
       }
     ],
+  },
+
+  'CRM-004': {
+    id: 'CRM-004',
+    crmId: 'CRM-004',
+    nombre: 'Luisa',
+    apellidos: 'Jiménez Moreno',
+    dni: '52847391K',
+    email: 'luisa.jimenez@gmail.com',
+    telefono: '677 234 891',
+    iban: 'ES91 2100 0418 4502 0005 1332',
+    direccion: 'Calle Serrano 112, 3ºB, Madrid',
+    cp: '28006',
+    ciudad: 'Madrid',
+    porfolio: 'mi_movistar',
+    bundleActual: 'cv1-300-20',
+    satisfaccionRiesgo: 'ok',
+    identificadoPorIVR: false,
+    riesgoScore: 'bajo',
+    estadoCliente: 'activo',
+    resumenNatural: 'Cliente con buen historial de pago. Llama por cargos de emoción (GameZone) recurrentes en los últimos 3 meses. Sin deuda activa.',
+    proximosEventos: [],
+    representantes: [],
+    productos: [
+      { id: 'p1', nombre: 'mi Movistar 300 Mb + 20 GB', tipo: 'fibra', estado: 'activa', precio: 44.90 },
+    ],
+    lineasMovil: [
+      {
+        id: 'lm1', numero: '677 234 891', tarifa: '20 GB', estado: 'activa', titularidad: 'titular',
+        consumoMes: { datosUsadosMB: 8192, datosTotalesMB: 20480, llamadasMinutos: 120, smsEnviados: 0, roamingActivo: false, fechaReset: '01/05/2026', enVuelo: { datosRestantesMB: 12288, diasRestantesCiclo: 19, alertaConsumo: false } },
+        addons: [],
+      },
+    ],
+    facturas: [
+      {
+        id: 'FAC-LJ-001', numero: 'FAC-LJ-001', periodo: 'Enero 2026',
+        fechaEmision: '01/02/2026', fechaVencimiento: '15/02/2026',
+        importe: 58.90, estado: 'pagada',
+        conceptos: [
+          { id: 'c1', descripcion: 'Cuota mensual mi Movistar 300 Mb', tipo: 'cuota', importe: 44.90 },
+          { id: 'c2', descripcion: 'Suscripción GameZone Premium – cargo emoción', tipo: 'consumo', importe: 14.00, anomalo: true },
+        ],
+      },
+      {
+        id: 'FAC-LJ-002', numero: 'FAC-LJ-002', periodo: 'Febrero 2026',
+        fechaEmision: '01/03/2026', fechaVencimiento: '15/03/2026',
+        importe: 58.90, estado: 'pagada',
+        conceptos: [
+          { id: 'c3', descripcion: 'Cuota mensual mi Movistar 300 Mb', tipo: 'cuota', importe: 44.90 },
+          { id: 'c4', descripcion: 'Suscripción GameZone Premium – cargo emoción', tipo: 'consumo', importe: 14.00, anomalo: true },
+        ],
+      },
+      {
+        id: 'FAC-LJ-003', numero: 'FAC-LJ-003', periodo: 'Marzo 2026',
+        fechaEmision: '01/04/2026', fechaVencimiento: '15/04/2026',
+        importe: 63.90, estado: 'pagada',
+        conceptos: [
+          { id: 'c5', descripcion: 'Cuota mensual mi Movistar 300 Mb', tipo: 'cuota', importe: 44.90 },
+          { id: 'c6', descripcion: 'Suscripción GameZone Premium – cargo emoción', tipo: 'consumo', importe: 14.00, anomalo: true },
+          { id: 'c7', descripcion: 'Suscripción GameZone Plus – cargo emoción', tipo: 'consumo', importe: 5.00, anomalo: true },
+        ],
+      },
+    ],
+    cobros: {
+      deudaTotal: 0,
+      estadoGeneral: 'en_plazo',
+      riesgo: 'bajo',
+      cedidaEGC: false,
+      deudaIncobrable: false,
+      saldoAFavor: 0,
+      facturasConDeuda: [],
+    },
+    reclamaciones: [],
+    averias: [],
+    pedidos: [],
+    historial: [
+      { id: 'h1', fecha: '11/04/2026', canal: 'Teléfono', motivo: 'Reclamación cargos emoción GameZone', causaAgrupacion: 'Reclamación económica', resolucion: '', agente: 'AGT-001', duracion: '—', resuelto: false },
+    ],
+    senalizacionesParque: [],
   }
 }
 
@@ -888,6 +967,13 @@ export const consumosPorCliente: Record<string, {
     { id: 'cv202', categoria: 'roaming', linea: '600 001 002', descripcion: 'Datos roaming Francia — reunión cliente', pais: 'Francia', fechaInicio: '20/02/2026', fechaFin: '21/02/2026', importe: 0, facturado: true, facturaId: 'f2', anomalo: false },
     { id: 'cv203', categoria: '900_800', linea: '600 001 001', descripcion: 'Llamada 900 gestión proveedores', fechaInicio: '12/03/2026', fechaFin: '12/03/2026', importe: 3.60, facturado: true, facturaId: 'f1', anomalo: false },
     { id: 'cv204', categoria: 'otros', linea: '600 001 003', descripcion: 'Exceso consumo datos sede secundaria', fechaInicio: '01/10/2025', fechaFin: '31/10/2025', importe: 44.36, facturado: true, facturaId: 'f6', anomalo: true },
+  ],
+  'CRM-004': [
+    { id: 'con-lj-001', categoria: 'emocion', linea: '677 234 891', descripcion: 'Suscripción GameZone Premium — enero 2026', fechaInicio: '01/01/2026', fechaFin: '31/01/2026', importe: 14.00, facturado: true, facturaId: 'FAC-LJ-001', anomalo: true },
+    { id: 'con-lj-002', categoria: 'emocion', linea: '677 234 891', descripcion: 'Suscripción GameZone Premium — febrero 2026', fechaInicio: '01/02/2026', fechaFin: '28/02/2026', importe: 14.00, facturado: true, facturaId: 'FAC-LJ-002', anomalo: true },
+    { id: 'con-lj-003', categoria: 'emocion', linea: '677 234 891', descripcion: 'Suscripción GameZone Premium — marzo 2026', fechaInicio: '01/03/2026', fechaFin: '31/03/2026', importe: 14.00, facturado: true, facturaId: 'FAC-LJ-003', anomalo: true },
+    { id: 'con-lj-004', categoria: 'emocion', linea: '677 234 891', descripcion: 'Suscripción GameZone Plus — alta 15/03 a 31/03', fechaInicio: '15/03/2026', fechaFin: '31/03/2026', importe: 5.00, facturado: true, facturaId: 'FAC-LJ-003', anomalo: true },
+    { id: 'con-lj-005', categoria: 'emocion', linea: '677 234 891', descripcion: 'Suscripción GameZone Premium — abril 2026 (en vuelo)', fechaInicio: '01/04/2026', fechaFin: null, importe: 14.00, facturado: false, facturaId: null, anomalo: true },
   ],
 }
 
@@ -1011,11 +1097,11 @@ export function crearSenalizacion(s: Omit<Senalizacion, 'id'>): Senalizacion {
 export type PaqueteBase = 'fusion' | 'mi_movistar'
 
 export const compatibilidadTV: Record<PaqueteBase, string[]> = {
-  fusion: ['tv-ficcion', 'tv-futbol', 'tv-total'],
-  mi_movistar: ['tv-ficcion', 'tv-futbol', 'tv-total', 'tv-netflix', 'tv-disney'],
+  fusion: ['futbol', 'ficcion', 'deportes'],
+  mi_movistar: ['futbol', 'ficcion', 'deportes', 'netflix', 'disney'],
 }
 
-export const addonsTVCore = ['tv-ficcion', 'tv-futbol', 'tv-total']
+export const addonsTVCore = ['futbol', 'ficcion', 'deportes']
 
 // ═══════════════════════════════════════════════════════════════
 // GENDUKA — EQUIVALENCIAS FUSIÓN → MI MOVISTAR (RF01-1)
@@ -1077,6 +1163,7 @@ export const clientesLista: { id: string; nombre: string; dni: string; telefono:
   { id: 'CRM-001', nombre: 'María García Fernández', dni: '12345678A', telefono: '+34 622 481 903', direccion: 'C/ Gran Vía, 48 3ºB', lineas: ['622 481 903', '611 204 771'], satisfaccionRiesgo: 'ok' },
   { id: 'CRM-002', nombre: 'Carlos Ruiz Martín', dni: '87654321B', telefono: '+34 654 892 001', direccion: 'Avda. Castellana, 120 5ºA', lineas: ['654 892 001'], satisfaccionRiesgo: 'critico' },
   { id: 'CRM-003', nombre: 'Empresa Técnica SL', dni: 'B12345678', telefono: '+34 912 345 678', direccion: 'C/ Serrano, 45 2ºD', lineas: ['600 001 001', '600 001 002', '600 001 003'], satisfaccionRiesgo: 'ok' },
+  { id: 'CRM-004', nombre: 'Luisa Jiménez Moreno', dni: '52847391K', telefono: '677 234 891', direccion: 'Calle Serrano 112, 3ºB, Madrid', lineas: ['677 234 891'], satisfaccionRiesgo: 'ok' },
 ]
 
 // ── FOCOS COMERCIALES ──

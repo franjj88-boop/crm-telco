@@ -39,6 +39,8 @@ export interface Cliente {
   }[]
   riesgoScore: 'bajo' | 'medio' | 'alto'
   representantes: Representante[]
+  iban?: string
+  estadoCliente?: 'activo' | 'baja' | 'suspendido'
 }
 
 export interface ProximoEvento {

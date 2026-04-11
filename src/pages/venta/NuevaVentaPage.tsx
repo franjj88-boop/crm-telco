@@ -63,6 +63,11 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
   const [cob, setCob] = useState<DatosCobertura>({ calle: '', numero: '', cp: '', ciudad: '', tecnologia: null, velocidadMax: 0, autoinstalable: false, verificada: false })
   const [verificando, setVerificando] = useState(false)
   const [sinCob, setSinCob] = useState(false)
+  const [callejeroQuery, setCallejeroQuery] = useState('')
+  const [callejeroSugerencias, setCallejeroSugerencias] = useState<{ display_name: string; address: { road?: string; house_number?: string; postcode?: string; city?: string; town?: string; village?: string; municipality?: string } }[]>([])
+  const [callejeroCargando, setCallejeroCargando] = useState(false)
+  const [callejeroTimer, setCallejeroTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [callejeroAbierto, setCallejeroAbierto] = useState(false)
 
   // Configurador paso 2
   const [fibraSel, setFibraSel] = useState<number | null>(null)
@@ -128,7 +133,8 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
   const precioBundle = bundleSel?.precio || 0
   const precioAddons = catalogoAddonsTV.filter(a => addonsSel.has(a.id)).reduce((s, a) => s + a.precio, 0)
   const precioFttr = fttr === 'con-instalacion' ? 12 : 0
-  const precioTotal = precioBundle + precioAddons + precioFttr
+  const precioSeguro = senalizaciones.includes('seguro-movil') ? 5.99 : 0
+  const precioTotal = precioBundle + precioAddons + precioFttr + precioSeguro
   const precioConIVA = precioTotal * 1.21
   const cuotaDisp = dispositivoSel?.precioMensual || 0
 
@@ -244,6 +250,12 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, color: '#6B7280' }}>{dispositivoSel.marca} {dispositivoSel.modelo}</span>
                   <span style={{ fontSize: 13 }}>+{cuotaDisp.toFixed(2)}€/mes</span>
+                </div>
+              )}
+              {senalizaciones.includes('seguro-movil') && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#374151', padding: '3px 0' }}>
+                  <span>Seguro Móvil Plus</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>+5.99 €/mes</span>
                 </div>
               )}
             </div>
@@ -458,6 +470,67 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
 
                   {!cob.verificada ? (
                     <>
+                      {/* Autocomplete Nominatim */}
+                      <div style={{ position: 'relative', marginBottom: 10 }}>
+                        <input
+                          className="input"
+                          placeholder="Buscar dirección (calle, número, ciudad)..."
+                          value={callejeroQuery}
+                          style={{ height: 44, width: '100%', boxSizing: 'border-box', paddingRight: callejeroCargando ? 36 : undefined }}
+                          onChange={e => {
+                            const q = e.target.value
+                            setCallejeroQuery(q)
+                            setCob(p => ({ ...p, calle: '', numero: '', cp: '', ciudad: '', verificada: false }))
+                            if (callejeroTimer) clearTimeout(callejeroTimer)
+                            if (q.length < 5) { setCallejeroSugerencias([]); setCallejeroAbierto(false); return }
+                            const t = setTimeout(async () => {
+                              setCallejeroCargando(true)
+                              try {
+                                const res = await fetch(
+                                  `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=es&limit=6&q=${encodeURIComponent(q)}`,
+                                  { headers: { 'Accept-Language': 'es' } }
+                                )
+                                const data = await res.json()
+                                setCallejeroSugerencias(data)
+                                setCallejeroAbierto(data.length > 0)
+                              } catch { /* red sin acceso — ignorar */ }
+                              finally { setCallejeroCargando(false) }
+                            }, 400)
+                            setCallejeroTimer(t)
+                          }}
+                          onBlur={() => setTimeout(() => setCallejeroAbierto(false), 150)}
+                          onFocus={() => { if (callejeroSugerencias.length > 0) setCallejeroAbierto(true) }}
+                        />
+                        {callejeroCargando && (
+                          <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>⏳</span>
+                        )}
+                        {callejeroAbierto && callejeroSugerencias.length > 0 && (
+                          <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'white', border: '1px solid #D1D5DB', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', margin: 0, padding: 0, listStyle: 'none', maxHeight: 260, overflowY: 'auto' }}>
+                            {callejeroSugerencias.map((s, i) => (
+                              <li
+                                key={i}
+                                onMouseDown={() => {
+                                  const a = s.address
+                                  const calle = a.road || ''
+                                  const numero = a.house_number || ''
+                                  const cp = a.postcode || ''
+                                  const ciudad = a.city || a.town || a.village || a.municipality || ''
+                                  setCob(p => ({ ...p, calle, numero, cp, ciudad, verificada: false }))
+                                  setCallejeroQuery([calle, numero, cp, ciudad].filter(Boolean).join(', '))
+                                  setCallejeroAbierto(false)
+                                }}
+                                style={{ padding: '10px 14px', fontSize: 13, color: '#374151', cursor: 'pointer', borderBottom: '1px solid #F3F4F6' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#F0F9FF')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                              >
+                                {s.display_name}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      {/* Campos manuales (se autocompletan al elegir sugerencia, editables) */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 10 }}>
                         <input className="input" placeholder="Calle / avenida / plaza..." value={cob.calle} onChange={e => setCob(p => ({ ...p, calle: e.target.value, verificada: false }))} style={{ height: 44 }} />
                         <input className="input" placeholder="Nº" value={cob.numero} onChange={e => setCob(p => ({ ...p, numero: e.target.value, verificada: false }))} style={{ height: 44 }} />
@@ -971,26 +1044,47 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                   {mostrarTerceros && (
                     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {catalogoTerceros.map(prod => {
-                        const sen = senalizaciones.includes(prod.id)
+                        const sel = senalizaciones.includes(prod.id)
                         return (
                           <div key={prod.id}
-                            onClick={() => setSenalizaciones(prev => prev.includes(prod.id) ? prev.filter(s => s !== prod.id) : [...prev, prod.id])}
-                            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 16px', border: `1.5px solid ${sen ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: 8, background: sen ? '#F0FDF4' : 'white', cursor: 'pointer', transition: 'all 0.1s' }}>
+                            onClick={() => setSenalizaciones(prev =>
+                              prev.includes(prod.id) ? prev.filter(s => s !== prod.id) : [...prev, prod.id]
+                            )}
+                            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 16px',
+                              border: `1.5px solid ${sel ? '#BBF7D0' : '#E5E7EB'}`,
+                              borderRadius: 8, background: sel ? '#F0FDF4' : 'white', cursor: 'pointer', transition: 'all 0.1s' }}>
                             <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{prod.icono}</span>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                                <span style={{ fontSize: 13, fontWeight: sen ? 700 : 600, color: sen ? '#166534' : '#111827' }}>{prod.nombre}</span>
-                                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, fontWeight: 700, background: prod.tramitable ? '#F0FDF4' : '#FFFBEB', color: prod.tramitable ? '#166534' : '#92400E', border: `1px solid ${prod.tramitable ? '#86EFAC' : '#FCD34D'}` }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{prod.nombre}</span>
+                                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, fontWeight: 700,
+                                  background: prod.tramitable ? '#F0FDF4' : '#FFFBEB',
+                                  color: prod.tramitable ? '#166534' : '#92400E',
+                                  border: `1px solid ${prod.tramitable ? '#86EFAC' : '#FCD34D'}` }}>
                                   {prod.tramitable ? '✓ Tramitable' : '📋 Señalizable'}
                                 </span>
+                                {prod.tramitable && (
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginLeft: 'auto' }}>
+                                    +5.99 €/mes
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>{prod.proveedor}</div>
                               <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>{prod.descripcion}</div>
+                              {prod.tramitable && sel && (
+                                <div style={{ marginTop: 6, fontSize: 11, color: '#166534', fontWeight: 600 }}>
+                                  ✓ Añadido al carrito — se incluirá en el pedido
+                                </div>
+                              )}
+                              {!prod.tramitable && sel && (
+                                <div style={{ marginTop: 6, fontSize: 11, color: '#92400E', fontWeight: 600 }}>
+                                  📋 Señalización creada — un especialista contactará al cliente
+                                </div>
+                              )}
                             </div>
-                            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                              <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${sen ? '#16A34A' : '#D1D5DB'}`, background: sen ? '#16A34A' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {sen && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>✓</span>}
-                              </div>
+                            <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${sel ? '#16A34A' : '#D1D5DB'}`,
+                              background: sel ? '#16A34A' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {sel && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>✓</span>}
                             </div>
                           </div>
                         )
