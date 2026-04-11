@@ -595,7 +595,7 @@ export function VentaPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, alignItems: 'start' }}>
         {/* Selector necesidades */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="card">
@@ -950,7 +950,7 @@ export function VentaPage() {
         </div>
 
         {/* Cesta */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ position: 'sticky', top: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="card" style={{ position: 'sticky', top: 0 }}>
             <div className="card-title">🔄 Nueva tarifa</div>
 

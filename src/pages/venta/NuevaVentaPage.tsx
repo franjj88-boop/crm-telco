@@ -218,7 +218,7 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
 
   // Panel resumen lateral
   const ResumenLateral = ({ mostrarFirma = false }: { mostrarFirma?: boolean }) => (
-    <div style={{ position: 'sticky', top: 80 }}>
+    <div style={{ position: 'sticky', top: 12 }}>
       <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#111827' }}>Resumen del pedido</div>
 
@@ -459,7 +459,7 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
 
         {/* ══════════ PASO 2 — PRODUCTO ══════════ */}
         {paso === 2 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Cobertura — solo convergente */}
@@ -1116,7 +1116,7 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
 
         {/* ══════════ PASO 3 — DATOS CLIENTE ══════════ */}
         {paso === 3 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 20 }}>Datos del cliente</div>
@@ -1227,7 +1227,7 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
 
         {/* ══════════ PASO 4 — PROVISIÓN ══════════ */}
         {paso === 4 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Instalación fibra */}
@@ -1326,7 +1326,7 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
               </button>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                 {/* Venta consciente */}
