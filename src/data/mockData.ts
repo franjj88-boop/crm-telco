@@ -866,25 +866,42 @@ export const datosCliente: Record<string, Cliente> = {
     satisfaccionRiesgo: 'ok',
     identificadoPorIVR: false,
     riesgoScore: 'bajo',
-    estadoCliente: 'activo',
-    resumenNatural: 'Cliente con buen historial de pago. Llama por cargos de emoción (GameZone) recurrentes en los últimos 3 meses. Sin deuda activa.',
+    resumenNatural: 'Cliente con buen historial de pago. Llama por cargos de emoción (GameZone) recurrentes en los últimos 3 meses. Tiene una línea adicional fuera del paquete convergente facturada por Movistar Móviles SL. Sin deuda activa.',
     proximosEventos: [],
     representantes: [],
     productos: [
       { id: 'p1', nombre: 'mi Movistar 300 Mb + 20 GB', tipo: 'fibra', estado: 'activa', precio: 44.90 },
+      { id: 'p2', nombre: '699 112 233 · Línea adicional 15GB', tipo: 'movil', estado: 'activa', precio: 15.90 },
     ],
     lineasMovil: [
       {
         id: 'lm1', numero: '677 234 891', tarifa: '20 GB', estado: 'activa', titularidad: 'titular',
-        consumoMes: { datosUsadosMB: 8192, datosTotalesMB: 20480, llamadasMinutos: 120, smsEnviados: 0, roamingActivo: false, fechaReset: '01/05/2026', enVuelo: { datosRestantesMB: 12288, diasRestantesCiclo: 19, alertaConsumo: false } },
-        addons: [],
+        consumoMes: {
+          datosUsadosMB: 8192, datosTotalesMB: 20480,
+          llamadasMinutos: 120, smsEnviados: 5,
+          roamingActivo: false, fechaReset: '01/04/2026',
+          enVuelo: { datosRestantesMB: 12288, diasRestantesCiclo: 8, alertaConsumo: false }
+        },
+        addons: []
+      },
+      {
+        id: 'lm2', numero: '699 112 233', tarifa: '15 GB', estado: 'activa', titularidad: 'adicional',
+        consumoMes: {
+          datosUsadosMB: 4096, datosTotalesMB: 15360,
+          llamadasMinutos: 45, smsEnviados: 2,
+          roamingActivo: false, fechaReset: '01/04/2026',
+          enVuelo: { datosRestantesMB: 11264, diasRestantesCiclo: 8, alertaConsumo: false }
+        },
+        addons: []
       },
     ],
     facturas: [
+      // ── JURÍDICA A — Telefónica de España SAU (convergente) ──
       {
         id: 'FAC-LJ-001', numero: 'FAC-LJ-001', periodo: 'Enero 2026',
         fechaEmision: '01/02/2026', fechaVencimiento: '15/02/2026',
         importe: 58.90, estado: 'pagada',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
         conceptos: [
           { id: 'c1', descripcion: 'Cuota mensual mi Movistar 300 Mb', tipo: 'cuota', importe: 44.90 },
           { id: 'c2', descripcion: 'Suscripción GameZone Premium – cargo emoción', tipo: 'consumo', importe: 14.00, anomalo: true },
@@ -894,6 +911,7 @@ export const datosCliente: Record<string, Cliente> = {
         id: 'FAC-LJ-002', numero: 'FAC-LJ-002', periodo: 'Febrero 2026',
         fechaEmision: '01/03/2026', fechaVencimiento: '15/03/2026',
         importe: 58.90, estado: 'pagada',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
         conceptos: [
           { id: 'c3', descripcion: 'Cuota mensual mi Movistar 300 Mb', tipo: 'cuota', importe: 44.90 },
           { id: 'c4', descripcion: 'Suscripción GameZone Premium – cargo emoción', tipo: 'consumo', importe: 14.00, anomalo: true },
@@ -903,11 +921,53 @@ export const datosCliente: Record<string, Cliente> = {
         id: 'FAC-LJ-003', numero: 'FAC-LJ-003', periodo: 'Marzo 2026',
         fechaEmision: '01/04/2026', fechaVencimiento: '15/04/2026',
         importe: 63.90, estado: 'pagada',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
         conceptos: [
           { id: 'c5', descripcion: 'Cuota mensual mi Movistar 300 Mb', tipo: 'cuota', importe: 44.90 },
           { id: 'c6', descripcion: 'Suscripción GameZone Premium – cargo emoción', tipo: 'consumo', importe: 14.00, anomalo: true },
           { id: 'c7', descripcion: 'Suscripción GameZone Plus – cargo emoción', tipo: 'consumo', importe: 5.00, anomalo: true },
         ],
+      },
+      // ── JURÍDICA B — Movistar Móviles SL (línea adicional) ──
+      {
+        id: 'FAC-LJ-B001', numero: 'FAC-LJ-B001', periodo: 'Enero 2026',
+        fechaEmision: '05/02/2026', fechaVencimiento: '20/02/2026',
+        importe: 15.90, estado: 'pagada',
+        juridica: 'Movistar Móviles SL', juridicaId: 'B' as const,
+        conceptos: [
+          { id: 'cb1', descripcion: 'Línea adicional 15GB — 699 112 233', tipo: 'cuota', importe: 15.90 },
+        ],
+      },
+      {
+        id: 'FAC-LJ-B002', numero: 'FAC-LJ-B002', periodo: 'Febrero 2026',
+        fechaEmision: '05/03/2026', fechaVencimiento: '20/03/2026',
+        importe: 15.90, estado: 'pagada',
+        juridica: 'Movistar Móviles SL', juridicaId: 'B' as const,
+        conceptos: [
+          { id: 'cb2', descripcion: 'Línea adicional 15GB — 699 112 233', tipo: 'cuota', importe: 15.90 },
+        ],
+      },
+      {
+        id: 'FAC-LJ-B003', numero: 'FAC-LJ-B003', periodo: 'Marzo 2026',
+        fechaEmision: '05/04/2026', fechaVencimiento: '20/04/2026',
+        importe: 15.90, estado: 'pagada',
+        juridica: 'Movistar Móviles SL', juridicaId: 'B' as const,
+        conceptos: [
+          { id: 'cb3', descripcion: 'Línea adicional 15GB — 699 112 233', tipo: 'cuota', importe: 15.90 },
+        ],
+      },
+      // ── RECTIFICATIVA (reclamación anterior dic 2025) ──
+      {
+        id: 'FAC-LJ-R001', numero: 'FAC-LJ-R001', periodo: 'Diciembre 2025',
+        fechaEmision: '15/01/2026', fechaVencimiento: '—',
+        importe: -9.99, estado: 'rectificativa',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
+        conceptos: [
+          { id: 'cr1', descripcion: 'Abono suscripción externa no reconocida — REC-2025-1891', tipo: 'abono', importe: -9.99 },
+        ],
+        esRectificativa: true,
+        facturaRectificadaId: 'FAC-LJ-DIC',
+        motivoRectificacion: 'Abono por reclamación económica — suscripción externa no autorizada',
       },
     ],
     cobros: {
@@ -919,11 +979,28 @@ export const datosCliente: Record<string, Cliente> = {
       saldoAFavor: 0,
       facturasConDeuda: [],
     },
-    reclamaciones: [],
+    reclamaciones: [
+      {
+        id: 'r-lj-001',
+        numero: 'REC-2025-1891',
+        estado: 'resuelta',
+        motivo: 'Suscripción externa no reconocida — diciembre 2025',
+        importeReclamado: 9.99,
+        facturaId: 'FAC-LJ-DIC',
+        fechaApertura: '05/01/2026',
+        canal: 'Teléfono',
+        bloquea: false,
+        resumenIA: 'Cliente reclamó cargo de suscripción externa de 9.99€ en diciembre 2025. Verificado como cargo no autorizado. Abono aplicado en factura rectificativa FAC-LJ-R001.',
+        conceptos: [
+          { id: 'rc1', descripcion: 'Suscripción externa no reconocida', importe: 9.99, seleccionado: true },
+        ],
+      },
+    ],
     averias: [],
     pedidos: [],
     historial: [
       { id: 'h1', fecha: '11/04/2026', canal: 'Teléfono', motivo: 'Reclamación cargos emoción GameZone', causaAgrupacion: 'Reclamación económica', resolucion: '', agente: 'AGT-001', duracion: '—', resuelto: false },
+      { id: 'h2', fecha: '05/01/2026', canal: 'Teléfono', motivo: 'Reclamación suscripción externa dic 2025', causaAgrupacion: 'Reclamación económica', resolucion: 'Reclamación abierta REC-2025-1891 — resuelta con abono', agente: 'AGT-223', duracion: '6min', resuelto: true },
     ],
     senalizacionesParque: [],
   }

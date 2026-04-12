@@ -179,6 +179,17 @@ export function FacturacionPage() {
   const datos = datosCliente[id]
   if (!datos) return null
 
+  const _meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const facturasOrdenadas = [...datos.facturas].sort((a, b) => {
+    const [mesA, anioA] = a.periodo.split(' ')
+    const [mesB, anioB] = b.periodo.split(' ')
+    if (anioB !== anioA) return parseInt(anioB) - parseInt(anioA)
+    if (mesB !== mesA) return _meses.indexOf(mesB) - _meses.indexOf(mesA)
+    const jA = a.juridicaId || 'A'
+    const jB = b.juridicaId || 'A'
+    return jA.localeCompare(jB)
+  })
+
   const factura = facturaActiva
     ? datos.facturas.find(f => f.id === facturaActiva) || datos.facturas[0]
     : datos.facturas[0]
@@ -267,8 +278,20 @@ export function FacturacionPage() {
 
   // Comparativa automática con factura anterior
   const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
-  const facturaActualIdx = factura ? facturasNormales.indexOf(factura) : 0
-  const facturaAnteriorAuto = facturasNormales[facturaActualIdx + 1] || null
+  const facturaAnteriorAuto = factura
+    ? facturasNormales.find(f =>
+        f.id !== factura.id &&
+        (f as any).juridicaId === ((factura as any).juridicaId || 'A') &&
+        (() => {
+          const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+          const [mesAct, anioAct] = factura.periodo.split(' ')
+          const [mesF, anioF] = f.periodo.split(' ')
+          const idxAct = parseInt(anioAct) * 12 + meses.indexOf(mesAct)
+          const idxF = parseInt(anioF) * 12 + meses.indexOf(mesF)
+          return idxF < idxAct
+        })()
+      ) || null
+    : null
   const diffsAuto = factura && facturaAnteriorAuto ? calcDiffs(factura, facturaAnteriorAuto) : []
   const deltaAuto = factura && facturaAnteriorAuto ? factura.importe - facturaAnteriorAuto.importe : 0
 
@@ -921,14 +944,29 @@ export function FacturacionPage() {
 
             {/* ── SPARKLINE evolución importes ── */}
             {(() => {
-              const ultimas = datos.facturas.filter(f => !(f as any).esRectificativa).slice(0, 12).reverse()
-              const max = Math.max(...ultimas.map(f => f.importe))
-              const min = Math.min(...ultimas.map(f => f.importe))
+              const facturasNormalesAll = facturasOrdenadas.filter(f => !(f as any).esRectificativa)
+              const periodos = [...new Set(facturasNormalesAll.map(f => f.periodo))].slice(0, 12).reverse()
+              const porPeriodo = periodos.map(periodo => {
+                const facsPeriodo = facturasNormalesAll.filter(f => f.periodo === periodo)
+                const totalA = facsPeriodo.filter(f => f.juridicaId === 'A' || !f.juridicaId).reduce((a, f) => a + f.importe, 0)
+                const totalB = facsPeriodo.filter(f => f.juridicaId === 'B').reduce((a, f) => a + f.importe, 0)
+                const total = totalA + totalB
+                return { periodo, totalA, totalB, total }
+              })
+              const max = Math.max(...porPeriodo.map(p => p.total))
+              const min = Math.min(...porPeriodo.map(p => p.total))
+              const tieneJuridicaB = porPeriodo.some(p => p.totalB > 0)
               return (
                 <div className="card" style={{ padding: '10px 12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Evolución últimos {ultimas.length} meses
+                      Evolución últimos {porPeriodo.length} meses
+                      {tieneJuridicaB && (
+                        <span style={{ marginLeft: 10, fontWeight: 400 }}>
+                          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'var(--color-blue)', marginRight: 3 }} />Jurídica A
+                          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'var(--color-green-border)', marginLeft: 8, marginRight: 3 }} />Jurídica B
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                       <span>Mín: <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-green-dark)' }}>{min.toFixed(0)}€</strong></span>
@@ -936,20 +974,25 @@ export function FacturacionPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 52 }}>
-                    {ultimas.map((f) => {
-                      const alturapx = max === min ? 26 : Math.round(((f.importe - min) / (max - min)) * 44 + 8)
-                      const tieneAnomalia = f.conceptos.some((c: any) => c.anomalo)
-                      const isActiva = factura?.id === f.id
+                    {porPeriodo.map((p) => {
+                      const alturaTotalPx = max === min ? 26 : Math.round(((p.total - min) / (max - min)) * 44 + 8)
+                      const alturaAPx = p.total > 0 ? Math.round((p.totalA / p.total) * alturaTotalPx) : 0
+                      const alturaBPx = alturaTotalPx - alturaAPx
+                      const facsPeriodo = facturasNormalesAll.filter(f => f.periodo === p.periodo)
+                      const tieneAnomalia = facsPeriodo.some(f => f.conceptos.some((c: any) => c.anomalo))
+                      const isActiva = factura?.periodo === p.periodo
                       return (
-                        <div key={f.id}
-                          onClick={() => seleccionarFactura(f.id)}
-                          title={`${f.periodo}: ${f.importe.toFixed(2)}€`}
-                          style={{ flex: 1, cursor: 'pointer', alignSelf: 'flex-end' }}>
+                        <div key={p.periodo}
+                          onClick={() => { const primera = facsPeriodo[0]; if (primera) seleccionarFactura(primera.id) }}
+                          title={`${p.periodo}: ${p.total.toFixed(2)}€${p.totalB > 0 ? ` (A: ${p.totalA.toFixed(2)}€ + B: ${p.totalB.toFixed(2)}€)` : ''}`}
+                          style={{ flex: 1, cursor: 'pointer', alignSelf: 'flex-end', display: 'flex', flexDirection: 'column' }}>
+                          {p.totalB > 0 && (
+                            <div style={{ width: '100%', height: alturaBPx, background: isActiva ? 'var(--color-green-dark)' : 'var(--color-green-border)', borderRadius: '3px 3px 0 0', opacity: isActiva ? 1 : 0.6 }} />
+                          )}
                           <div style={{
-                            width: '100%',
-                            height: alturapx,
-                            borderRadius: '3px 3px 0 0',
-                            background: isActiva ? 'var(--color-blue)' : tieneAnomalia ? 'var(--color-amber-mid)' : f.estado === 'vencida' ? 'var(--color-red-mid)' : 'var(--color-blue-mid)',
+                            width: '100%', height: alturaAPx,
+                            background: isActiva ? 'var(--color-blue)' : tieneAnomalia ? 'var(--color-amber-mid)' : 'var(--color-blue-mid)',
+                            borderRadius: p.totalB > 0 ? '0' : '3px 3px 0 0',
                             opacity: isActiva ? 1 : 0.55,
                             transition: 'all 0.15s',
                           }} />
@@ -958,8 +1001,8 @@ export function FacturacionPage() {
                     })}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--color-text-tertiary)' }}>
-                    <span>{ultimas[0]?.periodo?.split(' ')[1] || ''}</span>
-                    <span>{ultimas[ultimas.length - 1]?.periodo}</span>
+                    <span>{porPeriodo[0]?.periodo}</span>
+                    <span>{porPeriodo[porPeriodo.length - 1]?.periodo}</span>
                   </div>
                 </div>
               )
@@ -985,7 +1028,17 @@ export function FacturacionPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Historial ({datos.facturas.length} facturas)
+                Historial ({facturasOrdenadas.length} facturas)
+                {facturasOrdenadas.some(f => f.juridicaId === 'B') && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-blue-light)', color: 'var(--color-blue-dark)', border: '1px solid var(--color-blue-mid)', fontWeight: 600 }}>
+                      A — Telefónica de España SAU
+                    </span>
+                    <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-green-light)', color: 'var(--color-green-dark)', border: '1px solid var(--color-green-border)', fontWeight: 600 }}>
+                      B — Movistar Móviles SL
+                    </span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => { setModoEnvioMultiple(!modoEnvioMultiple); setSeleccionEnvio(new Set()) }}
@@ -1010,7 +1063,7 @@ export function FacturacionPage() {
               </div>
             )}
             {(() => {
-              const filtradas = datos.facturas.filter(f => {
+              const filtradas = facturasOrdenadas.filter(f => {
                 if (!busquedaInline) return true
                 const q = busquedaInline.toLowerCase()
                 return f.numero.toLowerCase().includes(q) ||
@@ -1040,6 +1093,11 @@ export function FacturacionPage() {
                         </div>
                       )}
                       <div style={{ fontSize: 12, fontWeight: 600 }}>{f.numero}</div>
+                      {f.juridica && (
+                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, fontWeight: 600, background: f.juridicaId === 'B' ? 'var(--color-green-light)' : 'var(--color-blue-light)', color: f.juridicaId === 'B' ? 'var(--color-green-dark)' : 'var(--color-blue-dark)', border: `1px solid ${f.juridicaId === 'B' ? 'var(--color-green-border)' : 'var(--color-blue-mid)'}` }}>
+                          {f.juridicaId === 'B' ? 'Movistar Móviles SL' : 'Telefónica de España SAU'}
+                        </span>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: f.estado === 'vencida' ? 'var(--color-red)' : 'var(--color-text-primary)' }}>

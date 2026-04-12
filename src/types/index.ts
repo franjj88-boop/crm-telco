@@ -261,6 +261,8 @@ export interface Factura {
   esRectificativa?: boolean
   facturaRectificadaId?: string
   motivoRectificacion?: string
+  juridica?: string
+  juridicaId?: 'A' | 'B'
 }
 
 export interface ConceptoFactura {
