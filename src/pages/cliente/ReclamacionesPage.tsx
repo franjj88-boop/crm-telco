@@ -89,11 +89,12 @@ export function ReclamacionesPage() {
   const [accionEjecutada, setAccionEjecutada] = useState<{ tipo: string; detalle: string } | null>(null)
 
   // RF-18 — Multi-factura y autocodificación
-  const facturasIniciales = (() => {
+  const _facturasInicialesVal = (() => {
     if (stateInicial?.facturasIds?.length > 0) return stateInicial.facturasIds
     if (stateInicial?.facturaId) return [stateInicial.facturaId]
     return []
   })()
+  const [facturasIniciales, setFacturasIniciales] = useState<string[]>(_facturasInicialesVal)
 
   const [modoMultiFactura, setModoMultiFactura] = useState(facturasIniciales.length > 0)
   const [facturasMulti, setFacturasMulti] = useState<string[]>(facturasIniciales)
@@ -529,7 +530,13 @@ export function ReclamacionesPage() {
 
               {modoMultiFactura ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {datos.facturas.filter(f => !(f as any).esRectificativa).map(f => {
+                  {datos.facturas
+                    .filter(f => !(f as any).esRectificativa)
+                    .filter(f => {
+                      if (facturasIniciales.length > 0) return facturasMulti.includes(f.id)
+                      return true
+                    })
+                    .map(f => {
                     const seleccionada = facturasMulti.includes(f.id)
                     return (
                       <div key={f.id}
@@ -576,6 +583,13 @@ export function ReclamacionesPage() {
                           }, 0).toFixed(2)
                       } €
                     </div>
+                  )}
+                  {facturasIniciales.length > 0 && (
+                    <button
+                      onClick={() => setFacturasIniciales([])}
+                      style={{ fontSize: 10, color: 'var(--color-blue)', background: 'none', border: 'none', cursor: 'pointer', marginTop: 6, padding: 0 }}>
+                      + Añadir más facturas
+                    </button>
                   )}
                 </div>
               ) : (
