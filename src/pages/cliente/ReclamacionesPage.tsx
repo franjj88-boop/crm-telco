@@ -73,7 +73,11 @@ export function ReclamacionesPage() {
   const [formMotivo, setFormMotivo] = useState(stateInicial?.motivo || '')
   const [formCategoria, setFormCategoria] = useState<'economica' | 'provision' | 'atencion'>('economica')
   const [formCanal, setFormCanal] = useState('Teléfono')
-  const [formImporte, setFormImporte] = useState(stateInicial?.importeTotal?.toString() || '')
+  const [formImporte, setFormImporte] = useState(
+    stateInicial?.importeTotal
+      ? parseFloat(stateInicial.importeTotal).toFixed(2)
+      : ''
+  )
   const [formFactura, setFormFactura] = useState(stateInicial?.facturasIds?.[0] || '')
   const [formComentarioAgente, setFormComentarioAgente] = useState('')
   const [mostrarComms, setMostrarComms] = useState<string | null>(null)
