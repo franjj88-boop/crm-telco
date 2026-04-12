@@ -460,7 +460,20 @@ export const datosCliente: Record<string, Cliente> = {
       { id: 'h1', fecha: '28/03/2026', canal: 'Teléfono', motivo: 'Reclamación roaming Francia', causaAgrupacion: 'Reclamación económica', resolucion: 'Reclamación abierta — pendiente resolución', agente: 'AGT-334', duracion: '8min', resuelto: false },
       { id: 'h2', fecha: '05/03/2026', canal: 'App', motivo: 'Solicitud mejora router Wi-Fi 7', causaAgrupacion: 'Pedido equipamiento', resolucion: 'Pedido creado PED-2026-0892', agente: 'Online', duracion: '—', resuelto: true },
       { id: 'h3', fecha: '12/01/2026', canal: 'Teléfono', motivo: 'Consulta factura diciembre', causaAgrupacion: 'Consulta factura', resolucion: 'Factura explicada — sin acción', agente: 'AGT-201', duracion: '4min', resuelto: true },
-    ]
+    ],
+    ivr: {
+      motivo: 'Reclamación económica',
+      submotivo: 'Roaming no reconocido',
+      tiempoEspera: '2min 14s',
+      identificado: true,
+      canal: 'Teléfono 1004',
+    },
+    nps: {
+      valor: 7,
+      segmento: 'pasivo' as const,
+      fecha: 'hace 2 semanas',
+      canal: 'Encuesta post-llamada',
+    },
   },
 
   'CRM-002': {
@@ -666,7 +679,20 @@ export const datosCliente: Record<string, Cliente> = {
       { id: 'h3', fecha: '22/03/2026', canal: 'Teléfono', motivo: 'Sin internet — avería', causaAgrupacion: 'Avería', resolucion: 'Bloqueada por impago — info dada', agente: 'AGT-201', duracion: '9min', resuelto: false },
       { id: 'h4', fecha: '15/03/2026', canal: 'Teléfono', motivo: 'Sin internet', causaAgrupacion: 'Avería', resolucion: 'Avería abierta AV-2026-1204', agente: 'AGT-334', duracion: '14min', resuelto: false },
       { id: 'h5', fecha: '02/03/2026', canal: 'Teléfono', motivo: 'Doble cobro febrero', causaAgrupacion: 'Reclamación económica', resolucion: 'Reclamación abierta REC-2026-0287', agente: 'AGT-445', duracion: '11min', resuelto: false },
-    ]
+    ],
+    ivr: {
+      motivo: 'Cobros',
+      submotivo: 'Deuda vencida — sin internet',
+      tiempoEspera: '4min 32s',
+      identificado: true,
+      canal: 'Teléfono 1004',
+    },
+    nps: {
+      valor: 2,
+      segmento: 'detractor' as const,
+      fecha: 'hace 1 mes',
+      canal: 'Encuesta post-llamada',
+    },
   },
 
   'CRM-003': {
@@ -847,6 +873,19 @@ export const datosCliente: Record<string, Cliente> = {
         estado: 'pendiente',
       }
     ],
+    ivr: {
+      motivo: 'Consulta comercial',
+      submotivo: 'Ampliación líneas móviles',
+      tiempoEspera: '0min 45s',
+      identificado: false,
+      canal: 'Teléfono 1004',
+    },
+    nps: {
+      valor: 9,
+      segmento: 'promotor' as const,
+      fecha: 'hace 3 semanas',
+      canal: 'Encuesta anual Business',
+    },
   },
 
   'CRM-004': {
@@ -1003,6 +1042,19 @@ export const datosCliente: Record<string, Cliente> = {
       { id: 'h2', fecha: '05/01/2026', canal: 'Teléfono', motivo: 'Reclamación suscripción externa dic 2025', causaAgrupacion: 'Reclamación económica', resolucion: 'Reclamación abierta REC-2025-1891 — resuelta con abono', agente: 'AGT-223', duracion: '6min', resuelto: true },
     ],
     senalizacionesParque: [],
+    ivr: {
+      motivo: 'Reclamación económica',
+      submotivo: 'Cargos emoción GameZone no reconocidos',
+      tiempoEspera: '1min 42s',
+      identificado: true,
+      canal: 'Teléfono 1004',
+    },
+    nps: {
+      valor: 4,
+      segmento: 'detractor' as const,
+      fecha: 'hace 6 semanas',
+      canal: 'Encuesta post-llamada',
+    },
   }
 }
 
@@ -1316,4 +1368,34 @@ export const argumentarioNBA: Record<string, { beneficios: string[]; comparativa
     comparativa: 'Para 2 líneas ilimitadas en otros operadores: desde 99€. Aquí: 84,90€.',
     ahorroPrecio: 12,
   },
+}
+
+export const propuestasNBA: Record<string, {
+  id: string
+  titulo: string
+  descripcion: string
+  tipo: 'dispositivo' | 'tarifa' | 'servicio' | 'contenido'
+  impactoMensual: number
+  prioridad: number
+  destino: string
+}[]> = {
+  'CRM-001': [
+    { id: 'n1', titulo: 'iPhone 15 desde 40.79€/mes', descripcion: 'Financiación 24 meses sin intereses. Compatible con su tarifa actual.', tipo: 'dispositivo', impactoMensual: 40.79, prioridad: 1, destino: 'dispositivos' },
+    { id: 'n2', titulo: 'Subida a Fusión 1Gb + Ilimitado', descripcion: 'El doble de velocidad y datos ilimitados por 10€/mes más.', tipo: 'tarifa', impactoMensual: 10, prioridad: 2, destino: 'venta' },
+    { id: 'n3', titulo: 'FTTR — Fibra hasta la habitación', descripcion: 'Extiende la fibra a cada habitación. Perfil ideal para su domicilio.', tipo: 'servicio', impactoMensual: 12, prioridad: 3, destino: 'venta' },
+  ],
+  'CRM-002': [
+    { id: 'n1', titulo: 'Migración Fusión → mi Movistar', descripcion: 'Porfolio descatalogado. Fibra 600Mb + ilimitado por 10€/mes más.', tipo: 'tarifa', impactoMensual: 10, prioridad: 1, destino: 'venta' },
+    { id: 'n2', titulo: 'Samsung Galaxy A55 desde 18.71€/mes', descripcion: 'Financiación 24 meses. Terminal compatible con su línea actual.', tipo: 'dispositivo', impactoMensual: 18.71, prioridad: 2, destino: 'dispositivos' },
+  ],
+  'CRM-003': [
+    { id: 'n1', titulo: 'Ampliación a 5 líneas Business', descripcion: '2 líneas adicionales Business Ilimitado. Descuento Business 20% aplicado.', tipo: 'tarifa', impactoMensual: 28.80, prioridad: 1, destino: 'venta' },
+    { id: 'n2', titulo: 'FTTR sede secundaria', descripcion: 'Fibra hasta la habitación en C/ Alcalá 200. Mejora de productividad.', tipo: 'servicio', impactoMensual: 12, prioridad: 2, destino: 'venta' },
+    { id: 'n3', titulo: 'Alarma Movistar Prosegur', descripcion: 'Interés detectado en última interacción. Especialista disponible.', tipo: 'servicio', impactoMensual: 0, prioridad: 3, destino: 'venta' },
+  ],
+  'CRM-004': [
+    { id: 'n1', titulo: 'Subida a 600Mb + 30GB', descripcion: 'El doble de velocidad por solo 10€/mes más. Sin permanencia.', tipo: 'tarifa', impactoMensual: 10, prioridad: 1, destino: 'venta' },
+    { id: 'n2', titulo: 'FTTR — Fibra hasta la habitación', descripcion: 'Extiende la fibra óptica a cada habitación del hogar.', tipo: 'servicio', impactoMensual: 12, prioridad: 2, destino: 'venta' },
+    { id: 'n3', titulo: 'Seguro de Móvil Plus', descripcion: 'Cobertura total rotura, robo y líquidos desde 5.99€/mes.', tipo: 'servicio', impactoMensual: 5.99, prioridad: 3, destino: 'dispositivos' },
+  ],
 }

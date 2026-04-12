@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { datosCliente } from '../../data/mockData'
+import { datosCliente, consumosPorCliente, propuestasNBA } from '../../data/mockData'
 
 export function HomePage() {
   const { id } = useParams()
@@ -9,325 +9,296 @@ export function HomePage() {
   const datos = datosCliente[id]
   if (!datos) return null
 
-  const esCritico = datos.satisfaccionRiesgo === 'critico'
-  const tieneDeuda = datos.cobros.deudaTotal > 0
-  const tieneAveria = datos.averias.some(a => a.estado !== 'resuelta')
-  const tieneReclamacion = datos.reclamaciones.some(r => r.estado !== 'resuelta')
-  const tienePedido = datos.pedidos.some(p => p.estado !== 'completado' && p.estado !== 'cancelado')
-  const masiva = datos.averias.find(a => a.masiva)?.masiva
-  const llamadasSinResolver = datos.historial.filter(h => !h.resuelto).length
-  const tienePatron = llamadasSinResolver >= 2
-
-  // Calcular diferencias reales entre facturas
-  const calcularDiferencias = () => {
-    if (datos.facturas.length < 2) return []
-    const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
-    const actual = facturasNormales[0]
-    const anterior = facturasNormales[1]
-    const diffs: { concepto: string; anterior: number; actual: number; delta: number; tipo: 'subida' | 'bajada' | 'nuevo' | 'eliminado' }[] = []
-
-    actual.conceptos.forEach(ca => {
-      const match = anterior.conceptos.find(cp =>
-        cp.descripcion.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim() ===
-        ca.descripcion.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim()
-      )
-      if (!match) {
-        diffs.push({ concepto: ca.descripcion, anterior: 0, actual: ca.importe, delta: ca.importe, tipo: 'nuevo' })
-      } else if (Math.abs(ca.importe - match.importe) > 0.01) {
-        diffs.push({ concepto: ca.descripcion, anterior: match.importe, actual: ca.importe, delta: ca.importe - match.importe, tipo: ca.importe > match.importe ? 'subida' : 'bajada' })
-      }
-    })
-    anterior.conceptos.forEach(cp => {
-      const match = actual.conceptos.find(ca =>
-        ca.descripcion.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim() ===
-        cp.descripcion.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim()
-      )
-      if (!match) {
-        diffs.push({ concepto: cp.descripcion, anterior: cp.importe, actual: 0, delta: -cp.importe, tipo: 'eliminado' })
-      }
-    })
-    return diffs
-  }
-
-  const diferencias = calcularDiferencias()
-  const facturasNormalesHome = datos.facturas.filter(f => !(f as any).esRectificativa)
-  const deltaTotalFactura = facturasNormalesHome.length >= 2
-    ? facturasNormalesHome[0].importe - facturasNormalesHome[1].importe
-    : 0
-
   return (
     <>
-      {/* Banner crítico */}
-      {esCritico && (
-        <div className="critical-banner fade-in">
-          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 1 }}>Cliente en estado CRÍTICO</div>
-            <div style={{ fontSize: 11, opacity: 0.9, fontWeight: 400, lineHeight: 1.5 }}>{datos.resumenNatural}</div>
-          </div>
+      {/* Alertas críticas — solo si existen */}
+      {datos.cobros?.estadoGeneral === 'vencida' && (
+        <div style={{ padding: '8px 14px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-red-light)', border: '1px solid var(--color-red-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--color-red-dark)', fontWeight: 600 }}>
+          <span>⚠ Deuda vencida — {datos.cobros.deudaTotal.toFixed(2)}€ · Gestionar antes de cualquier tramitación</span>
+          <button onClick={() => navigate(`/cliente/${id}/cobros`)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--color-red-border)', background: 'white', color: 'var(--color-red-dark)', cursor: 'pointer', fontWeight: 700 }}>Cobros →</button>
+        </div>
+      )}
+      {datos.averias?.some(a => a.masiva) && (
+        <div style={{ padding: '8px 14px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+          📡 Incidencia masiva activa — {datos.averias.find(a => a.masiva)?.masiva?.descripcion}
         </div>
       )}
 
-      {/* Masiva */}
-      {masiva && (
-        <div className="warning-banner fade-in">
-          <span style={{ fontSize: 14, flexShrink: 0 }}>📡</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Incidencia masiva — {masiva.referencia}</div>
-            <div style={{ fontSize: 11, opacity: 0.85 }}>{masiva.descripcion} · ETA: {masiva.eta}</div>
-          </div>
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
-      {/* Patrón repetición */}
-      {tienePatron && (
-        <div className="alert alert-warn fade-in" style={{ padding: '8px 12px' }}>
-          <span style={{ flexShrink: 0 }}>🔁</span>
-          <div style={{ fontSize: 11 }}>
-            <strong>Patrón de repetición</strong> — {llamadasSinResolver} llamadas sin resolver.
-            Motivo principal: <strong>{datos.historial.find(h => !h.resuelto)?.causaAgrupacion}</strong>
-          </div>
-        </div>
-      )}
-
-      {/* Resumen natural (solo si no es crítico) */}
-      {!esCritico && (
-        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.7, padding: '8px 12px', background: 'var(--color-background-primary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid var(--color-border-tertiary)' }}>
-          {datos.resumenNatural}
-        </div>
-      )}
-
-      {/* KPIs — franja compacta */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-        {[
-          { label: 'Facturas', valor: datos.facturas.length, sub: datos.facturas.filter(f => f.estado === 'vencida').length > 0 ? `${datos.facturas.filter(f => f.estado === 'vencida').length} vencida/s` : 'Al día', tipo: datos.facturas.some(f => f.estado === 'vencida') ? 'err' : 'ok', ruta: 'facturas' },
-          { label: 'Deuda', valor: tieneDeuda ? `${datos.cobros.deudaTotal.toFixed(2)}€` : 'Sin deuda', sub: tieneDeuda ? datos.cobros.estadoGeneral.replace('_', ' ') : 'Al corriente', tipo: tieneDeuda ? 'err' : 'ok', ruta: 'cobros' },
-          { label: 'Averías', valor: datos.averias.filter(a => a.estado !== 'resuelta').length, sub: datos.averias.length === 0 ? 'Sin averías' : datos.averias[0].estado.replace(/_/g, ' '), tipo: tieneAveria ? 'err' : 'ok', ruta: 'averias' },
-          { label: 'Reclamaciones', valor: datos.reclamaciones.length, sub: tieneReclamacion ? 'Activa/s' : 'Sin activas', tipo: tieneReclamacion ? 'warn' : 'ok', ruta: 'reclamaciones' },
-        ].map(kpi => (
-          <div key={kpi.label} onClick={() => navigate(`/cliente/${id}/${kpi.ruta}`)}
-            style={{ background: 'var(--color-background-primary)', border: `1px solid ${kpi.tipo === 'err' ? 'var(--color-red-border)' : kpi.tipo === 'warn' ? 'var(--color-amber-border)' : 'var(--color-border-tertiary)'}`, borderTop: `3px solid ${kpi.tipo === 'err' ? 'var(--color-red-mid)' : kpi.tipo === 'warn' ? 'var(--color-amber-mid)' : 'var(--color-green-border)'}`, borderRadius: 'var(--border-radius-lg)', padding: '10px 12px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
-            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{kpi.label}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)', color: kpi.tipo === 'err' ? 'var(--color-red)' : kpi.tipo === 'warn' ? 'var(--color-amber)' : 'var(--color-green)', marginBottom: 2 }}>{kpi.valor}</div>
-            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{kpi.sub}</div>
-          </div>
-        ))}
-      </div>
-
-<div className="grid2">
-        {/* RF-03 — Resumen inteligente de interacciones omnicanal */}
-        <div className="card">
-          <div className="card-title">Interacciones recientes</div>
-          {(() => {
-            const historial = datos.historial || []
-
-            const porMotivo: Record<string, typeof historial> = {}
-            historial.forEach(h => {
-              const key = h.motivo || 'Sin motivo'
-              if (!porMotivo[key]) porMotivo[key] = []
-              porMotivo[key].push(h)
-            })
-
-            const patrones = Object.entries(porMotivo).filter(([, items]) => items.length >= 2)
-
-            return (
-              <>
-                {/* Patrones detectados — RF-03 CA-03-02 */}
-                {patrones.length > 0 && (
-                  <div style={{ marginBottom: 12, padding: '8px 10px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 4 }}>
-                      🔁 Patrones detectados
-                    </div>
-                    {patrones.map(([motivo, items]) => (
-                      <div key={motivo} style={{ fontSize: 11, color: 'var(--color-amber-dark)', marginBottom: 2 }}>
-                        ⚠ <strong>{items.length} contactos</strong> por "{motivo}" en los últimos {Math.ceil(items.length * 3)} días
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {historial.slice(0, 4).map((h, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '7px 0', borderBottom: i < 3 ? '1px solid var(--color-border-tertiary)' : 'none' }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: 14, flexShrink: 0 }}>
-                          {h.canal === 'telefono' ? '📞' : h.canal === 'tienda' ? '🏪' : h.canal === 'chat' ? '💬' : '📱'}
-                        </span>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>{h.motivo || 'Consulta general'}</div>
-                          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{h.fecha} · {h.canal}</div>
-                          {!h.resuelto && (
-                            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 9999, background: 'var(--color-amber-light)', color: 'var(--color-amber-dark)', border: '1px solid var(--color-amber-border)', fontWeight: 700 }}>
-                              Sin resolver
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {porMotivo[h.motivo || 'Sin motivo']?.length >= 2 && (
-                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-red-light)', color: 'var(--color-red-dark)', border: '1px solid var(--color-red-border)', fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
-                          {porMotivo[h.motivo || 'Sin motivo'].length}x
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )
-          })()}
-        </div>
-
-        {/* Panel derecho */}
+        {/* COLUMNA IZQUIERDA */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-          {/* Comparativa facturas con diferencias reales */}
-          {datos.facturas.length >= 2 && (
-            <div className="card">
-              <div className="card-title">
-                Comparativa facturas
-                {deltaTotalFactura !== 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: deltaTotalFactura > 0 ? 'var(--color-red)' : 'var(--color-green)', textTransform: 'none', letterSpacing: 0 }}>
-                    {deltaTotalFactura > 0 ? '↑' : '↓'} {Math.abs(deltaTotalFactura).toFixed(2)}€
-                  </span>
-                )}
-              </div>
+          {/* Última factura con desglose */}
+          {(() => {
+            const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
+            const periodos = [...new Set(facturasNormales.map(f => f.periodo))]
+            const ultimoPeriodo = periodos[0]
+            const facturasUltimo = facturasNormales.filter(f => f.periodo === ultimoPeriodo)
+            const totalUltimo = facturasUltimo.reduce((a, f) => a + f.importe, 0)
+            const periodoAnterior = periodos[1]
+            const facturasAnterior = facturasNormales.filter(f => f.periodo === periodoAnterior)
+            const totalAnterior = facturasAnterior.reduce((a, f) => a + f.importe, 0)
+            const delta = totalUltimo - totalAnterior
+            const conceptosAnomalos = facturasUltimo.flatMap(f => f.conceptos.filter((c: any) => c.anomalo))
 
-              {/* Resumen por factura */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                {facturasNormalesHome.slice(0, 2).map((f, i) => (
-                  <div key={f.id} style={{ flex: 1, padding: '8px 10px', background: i === 0 ? 'var(--color-background-secondary)' : 'transparent', border: `1px solid ${f.estado === 'vencida' ? 'var(--color-red-border)' : 'var(--color-border-tertiary)'}`, borderRadius: 'var(--border-radius-md)' }}>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>{i === 0 ? 'Actual' : 'Anterior'} · {f.periodo}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: f.estado === 'vencida' ? 'var(--color-red)' : 'var(--color-text-primary)' }}>{f.importe.toFixed(2)}€</div>
-                    <span className={`pill pill-${f.estado === 'pagada' ? 'ok' : f.estado === 'vencida' ? 'err' : 'warn'}`} style={{ fontSize: 9, marginTop: 4, display: 'inline-block' }}>{f.estado}</span>
+            return (
+              <div className="card">
+                <div className="card-title">
+                  Última factura · {ultimoPeriodo}
+                  <button onClick={() => navigate(`/cliente/${id}/facturas`)} style={{ fontSize: 10, color: 'var(--color-blue)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Ver detalle →</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1 }}>{totalUltimo.toFixed(2)}€</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
+                      {facturasUltimo.length > 1 ? `${facturasUltimo.length} jurídicas` : (facturasUltimo[0] as any)?.juridica || 'Telefónica de España SAU'}
+                    </div>
                   </div>
-                ))}
-              </div>
-
-              {/* Diferencias reales */}
-              {diferencias.length > 0 ? (
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Variaciones detectadas</div>
-                  {diferencias.map((d, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', marginBottom: 3, borderRadius: 'var(--border-radius-sm)', background: d.tipo === 'nuevo' || d.tipo === 'subida' ? 'var(--color-red-light)' : 'var(--color-green-light)', border: `1px solid ${d.tipo === 'nuevo' || d.tipo === 'subida' ? 'var(--color-red-border)' : 'var(--color-green-border)'}` }}>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 500, color: d.tipo === 'nuevo' || d.tipo === 'subida' ? 'var(--color-red-dark)' : 'var(--color-green-dark)' }}>
-                          {d.tipo === 'nuevo' ? '+ Nuevo: ' : d.tipo === 'eliminado' ? '− Eliminado: ' : ''}{d.concepto.replace(/\s*\([^)]*\)/g, '')}
-                        </div>
-                        {d.tipo !== 'nuevo' && d.tipo !== 'eliminado' && (
-                          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{d.anterior.toFixed(2)}€ → {d.actual.toFixed(2)}€</div>
-                        )}
+                  {periodoAnterior && (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: delta > 0 ? 'var(--color-red-dark)' : delta < 0 ? 'var(--color-green-dark)' : 'var(--color-text-tertiary)' }}>
+                        {delta > 0 ? '↑ +' : delta < 0 ? '↓ ' : '= '}{delta.toFixed(2)}€ vs {periodoAnterior}
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: d.delta > 0 ? 'var(--color-red)' : 'var(--color-green)', flexShrink: 0 }}>
-                        {d.delta > 0 ? '+' : ''}{d.delta.toFixed(2)}€
+                    </div>
+                  )}
+                </div>
+
+                {/* Conceptos */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: conceptosAnomalos.length > 0 ? 10 : 0 }}>
+                  {facturasUltimo.flatMap(f => f.conceptos).slice(0, 5).map((c: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', borderRadius: 5, background: c.anomalo ? 'var(--color-amber-light)' : 'var(--color-background-secondary)', border: c.anomalo ? '1px solid var(--color-amber-border)' : 'none' }}>
+                      <span style={{ fontSize: 11, color: c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-text-secondary)', fontWeight: c.anomalo ? 600 : 400 }}>
+                        {c.anomalo && '⚠ '}{c.descripcion}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: c.anomalo ? 'var(--color-amber-dark)' : 'var(--color-text-primary)', flexShrink: 0, marginLeft: 8 }}>
+                        {c.importe > 0 ? '+' : ''}{c.importe.toFixed(2)}€
                       </span>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '8px 0' }}>
-                  Sin variaciones entre facturas
-                </div>
-              )}
 
-              <button onClick={() => navigate(`/cliente/${id}/facturas`)} className="btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 8, fontSize: 11 }}>
-                Ver detalle completo →
-              </button>
-            </div>
-          )}
-
-          {/* Deuda O2 */}
-          {datos.cobros.tieneDeudaO2 && (
-            <div
-              onClick={() => navigate(`/cliente/${id}/cobros`)}
-              className="card"
-              style={{ background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', cursor: 'pointer' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-amber-dark)', marginBottom: 3 }}>⚠ Deuda O2 pendiente</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-amber-dark)' }}>El cliente tiene deuda registrada en el sistema O2 — revisar en cobros</div>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--color-amber-dark)', fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Ver →</span>
+                {/* Diagnóstico si hay anómalos */}
+                {conceptosAnomalos.length > 0 && (
+                  <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Diagnóstico automático
+                    </div>
+                    {conceptosAnomalos.map((c: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-amber-dark)', marginBottom: 3 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-amber-dark)', flexShrink: 0 }} />
+                        <span style={{ flex: 1 }}>{c.descripcion} — cargo no estándar</span>
+                        <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.importe.toFixed(2)}€</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )
+          })()}
+
+          {/* Interacciones recientes con patrones */}
+          {(() => {
+            const historial = datos.historial || []
+            const porMotivo: Record<string, typeof historial> = {}
+            historial.forEach((h: any) => {
+              const key = h.motivo || 'Sin motivo'
+              if (!porMotivo[key]) porMotivo[key] = []
+              porMotivo[key].push(h)
+            })
+            const patrones = Object.entries(porMotivo).filter(([, items]) => items.length >= 2)
+            return (
+              <div className="card">
+                <div className="card-title">Interacciones recientes</div>
+                {patrones.length > 0 && (
+                  <div style={{ marginBottom: 10, padding: '6px 8px', borderRadius: 6, background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 10, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                    🔁 Patrón: {patrones.map(([m, items]) => `${items.length}× "${m}"`).join(' · ')}
+                  </div>
+                )}
+                {historial.slice(0, 4).map((h: any, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: i < Math.min(historial.length, 4) - 1 ? '1px solid var(--color-border-tertiary)' : 'none' }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: h.resuelto ? 'var(--color-green-light)' : 'var(--color-amber-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: h.resuelto ? 'var(--color-green-dark)' : 'var(--color-amber-dark)', flexShrink: 0 }}>
+                      {h.canal === 'Teléfono' ? 'T' : h.canal === 'Tienda' ? 'Ti' : 'C'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-primary)' }}>{h.motivo}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{h.fecha} · {h.canal}</div>
+                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 7, fontWeight: 700, display: 'inline-block', marginTop: 2, background: h.resuelto ? 'var(--color-green-light)' : 'var(--color-amber-light)', color: h.resuelto ? 'var(--color-green-dark)' : 'var(--color-amber-dark)', border: `1px solid ${h.resuelto ? 'var(--color-green-border)' : 'var(--color-amber-border)'}` }}>
+                        {h.resuelto ? 'Resuelto' : 'Sin resolver'}
+                      </span>
+                    </div>
+                    {(porMotivo[h.motivo || 'Sin motivo']?.length || 0) >= 2 && (
+                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 7, background: 'var(--color-red-light)', color: 'var(--color-red-dark)', fontWeight: 700, alignSelf: 'flex-start', flexShrink: 0 }}>
+                        {porMotivo[h.motivo || 'Sin motivo'].length}×
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* COLUMNA DERECHA */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Parque activo */}
+          {(() => {
+            const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
+            const periodos = [...new Set(facturasNormales.map(f => f.periodo))]
+            const totalMes = facturasNormales.filter(f => f.periodo === periodos[0]).reduce((a, f) => a + f.importe, 0)
+            const consumosAnomalos = consumosPorCliente[id || '']?.filter((c) => c.anomalo && !c.facturado) || []
+
+            return (
+              <div className="card">
+                <div className="card-title">
+                  Parque activo
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>{totalMes.toFixed(2)}€/mes</span>
+                </div>
+                {datos.productos.map((p: any) => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--color-border-tertiary)' }}>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.estado === 'activa' ? 'var(--color-green-border)' : p.estado === 'suspendida' ? 'var(--color-red-mid)' : 'var(--color-amber-mid)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--color-text-primary)', flex: 1 }}>{p.nombre}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)' }}>{p.precio?.toFixed(2)}€</span>
+                  </div>
+                ))}
+                {consumosAnomalos.length > 0 && (
+                  <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 5, background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 10, color: 'var(--color-amber-dark)', fontWeight: 600 }}>
+                    ⚠ {consumosAnomalos.length} consumo{consumosAnomalos.length > 1 ? 's' : ''} en vuelo anómalo{consumosAnomalos.length > 1 ? 's' : ''} no facturado{consumosAnomalos.length > 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Próximos eventos */}
-          {datos.proximosEventos.length > 0 && (
+          {datos.proximosEventos?.length > 0 && (
             <div className="card">
               <div className="card-title">Próximos eventos</div>
-              {datos.proximosEventos.map(ev => (
+              {datos.proximosEventos.map((ev: any) => (
                 <div key={ev.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--color-border-tertiary)', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{ev.descripcion}</span>
-                  <span style={{ color: ev.impacto === 'negativo' ? 'var(--color-amber-dark)' : ev.impacto === 'positivo' ? 'var(--color-green)' : 'var(--color-text-tertiary)', fontWeight: 500, flexShrink: 0, marginLeft: 8 }}>{ev.fecha}</span>
+                  <span style={{ fontWeight: 600, color: ev.impacto === 'negativo' ? 'var(--color-red-dark)' : ev.impacto === 'positivo' ? 'var(--color-green-dark)' : 'var(--color-text-tertiary)', flexShrink: 0, marginLeft: 8 }}>{ev.fecha}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Pedido en vuelo */}
-          {tienePedido && (() => {
-            const pedido = datos.pedidos.find(p => p.estado !== 'completado' && p.estado !== 'cancelado')
-            if (!pedido) return null
+          {/* NBA — propuesta comercial */}
+          {(() => {
+            const npsDetractor = datos.nps?.segmento === 'detractor'
+            const hayReclamacionActiva = datos.reclamaciones?.some(
+              r => r.estado === 'abierta' || r.estado === 'en_gestion'
+            )
+            const hayDeuda = datos.cobros?.estadoGeneral === 'vencida'
+            const hayAveria = datos.averias?.some(a => a.estado !== 'resuelta')
+            const bloqueado = hayDeuda || hayAveria
+            const propuestas = propuestasNBA[id || ''] || []
+
+            const iconoTipo = (tipo: string) => ({
+              dispositivo: '📱', tarifa: '🔄', servicio: '🔧', contenido: '📺'
+            }[tipo] || '💡')
+
             return (
-              <div className="card fade-in" onClick={() => navigate(`/cliente/${id}/pedidos`)}
-                style={{ border: '1px solid var(--color-blue-mid)', background: 'var(--color-blue-light)', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-blue-dark)', marginBottom: 3 }}>📦 Pedido en vuelo</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)' }}>{pedido.numero}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-blue-dark)', marginTop: 2 }}>{pedido.producto}</div>
+              <div className="card">
+                <div className="card-title">NBA · propuesta comercial</div>
+
+                {bloqueado && (
+                  <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)', marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 3 }}>⚠ No presentar ahora</div>
+                    <div>
+                      {hayDeuda && 'Deuda vencida — gestionar en Cobros primero. '}
+                      {hayAveria && 'Avería sin resolver. '}
+                      {hayReclamacionActiva && 'Reclamación activa — resolver antes de ofertar. '}
+                      {npsDetractor && !hayReclamacionActiva && !hayDeuda && !hayAveria && `NPS ${datos.nps?.valor}/10 — cliente detractor, priorizar resolución.`}
+                    </div>
+                    {hayReclamacionActiva && (
+                      <button onClick={() => navigate(`/cliente/${id}/consumos`)}
+                        style={{ marginTop: 6, fontSize: 10, padding: '3px 8px', borderRadius: 9999, border: '1px solid var(--color-amber-border)', background: 'white', color: 'var(--color-amber-dark)', cursor: 'pointer', fontWeight: 700 }}>
+                        Acción recomendada: bloquear emoción →
+                      </button>
+                    )}
+                    {hayDeuda && (
+                      <button onClick={() => navigate(`/cliente/${id}/cobros`)}
+                        style={{ marginTop: 6, fontSize: 10, padding: '3px 8px', borderRadius: 9999, border: '1px solid var(--color-amber-border)', background: 'white', color: 'var(--color-amber-dark)', cursor: 'pointer', fontWeight: 700 }}>
+                        Acción recomendada: ir a Cobros →
+                      </button>
+                    )}
                   </div>
-                  <span className="pill pill-blue" style={{ fontSize: 9 }}>{pedido.estado.replace(/_/g, ' ')}</span>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {npsDetractor && !bloqueado && (
+                    <div style={{ fontSize: 10, color: 'var(--color-amber-dark)', marginBottom: 8, padding: '5px 8px', borderRadius: 5, background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontStyle: 'italic' }}>
+                      NPS {datos.nps?.valor}/10 · detractor — presentar propuesta con cautela
+                    </div>
+                  )}
+                  {propuestas.slice(0, 3).map((p, i) => (
+                    <div key={p.id}
+                      onClick={() => !bloqueado && navigate(`/cliente/${id}/${p.destino}`)}
+                      style={{
+                        padding: '9px 11px', borderRadius: 6,
+                        border: `1px solid ${bloqueado ? 'var(--color-border-tertiary)' : i === 0 ? 'var(--color-blue-mid)' : 'var(--color-border-secondary)'}`,
+                        background: bloqueado ? 'var(--color-background-secondary)' : i === 0 ? 'var(--color-blue-light)' : 'var(--color-background-primary)',
+                        cursor: bloqueado ? 'default' : 'pointer',
+                        opacity: bloqueado ? 0.6 : 1,
+                        transition: 'all 0.1s',
+                      }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                            <span style={{ fontSize: 14 }}>{iconoTipo(p.tipo)}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: bloqueado ? 'var(--color-text-secondary)' : i === 0 ? 'var(--color-blue-dark)' : 'var(--color-text-primary)' }}>
+                              {p.titulo}
+                            </span>
+                            {i === 0 && !bloqueado && (
+                              <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 9999, background: 'var(--color-blue)', color: 'white', fontWeight: 700 }}>TOP</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>{p.descripcion}</div>
+                        </div>
+                        {p.impactoMensual > 0 && (
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: bloqueado ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>
+                              +{p.impactoMensual.toFixed(2)}€
+                            </div>
+                            <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>/mes</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {pedido.citaFecha && (
-                  <div style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 'var(--border-radius-md)', fontSize: 11, color: 'var(--color-blue-dark)', fontWeight: 600 }}>
-                    📅 Cita: {pedido.citaFecha} · {pedido.citaHora}
-                  </div>
-                )}
-                {!pedido.citaFecha && pedido.proximoHito && (
-                  <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
-                    Próximo hito: {pedido.proximoHito} · {pedido.fechaProximoHito}
-                  </div>
-                )}
-                <div style={{ fontSize: 10, color: 'var(--color-blue-dark)', marginTop: 6, fontWeight: 600 }}>Ver detalle →</div>
               </div>
             )
           })()}
+
+          {/* Pedido en vuelo */}
+          {datos.pedidos?.filter(p => p.estado !== 'completado' && p.estado !== 'cancelado').map(pedido => (
+            <div key={pedido.id} className="card" onClick={() => navigate(`/cliente/${id}/pedidos`)} style={{ border: '1px solid var(--color-blue-mid)', background: 'var(--color-blue-light)', cursor: 'pointer' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-blue-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Pedido en vuelo</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-blue-dark)' }}>{pedido.numero} · {pedido.producto}</div>
+              {pedido.citaFecha && <div style={{ fontSize: 11, color: 'var(--color-blue-dark)', marginTop: 4 }}>📅 Cita: {pedido.citaFecha} · {pedido.citaHora}</div>}
+              <div style={{ fontSize: 10, color: 'var(--color-blue-dark)', marginTop: 6, fontWeight: 600 }}>Ver detalle →</div>
+            </div>
+          ))}
 
           {/* Avería activa */}
-          {tieneAveria && (() => {
-            const averia = datos.averias.find(a => a.estado !== 'resuelta')
-            if (!averia) return null
-            const bloqueada = averia.estado === 'bloqueada_impago'
-            return (
-              <div className="card fade-in" onClick={() => navigate(`/cliente/${id}/averias`)}
-                style={{ border: `1px solid ${bloqueada ? 'var(--color-red-border)' : 'var(--color-amber-border)'}`, background: bloqueada ? 'var(--color-red-light)' : 'var(--color-amber-light)', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginBottom: 3 }}>
-                      🔧 Avería {bloqueada ? 'bloqueada' : 'activa'}
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)' }}>AV-{averia.numero}</div>
-                    <div style={{ fontSize: 11, color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginTop: 2 }}>{averia.sintoma}</div>
-                  </div>
-                  <span className={`pill ${bloqueada ? 'pill-err' : 'pill-warn'}`} style={{ fontSize: 9 }}>{averia.estado.replace(/_/g, ' ')}</span>
-                </div>
-                {bloqueada && (
-                  <div style={{ fontSize: 10, color: 'var(--color-red-dark)', fontWeight: 600 }}>
-                    ⚠ Bloqueada por impago — regularizar cobro primero
-                  </div>
-                )}
-                <div style={{ fontSize: 10, color: bloqueada ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginTop: 4, fontWeight: 600 }}>Ver avería →</div>
+          {datos.averias?.filter(a => a.estado !== 'resuelta').map(averia => (
+            <div key={averia.id} className="card" onClick={() => navigate(`/cliente/${id}/averias`)} style={{ border: `1px solid ${averia.estado === 'bloqueada_impago' ? 'var(--color-red-border)' : 'var(--color-amber-border)'}`, background: averia.estado === 'bloqueada_impago' ? 'var(--color-red-light)' : 'var(--color-amber-light)', cursor: 'pointer' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: averia.estado === 'bloqueada_impago' ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>
+                🔧 Avería {averia.estado === 'bloqueada_impago' ? 'bloqueada' : 'activa'}
               </div>
-            )
-          })()}
+              <div style={{ fontSize: 12, fontWeight: 700, color: averia.estado === 'bloqueada_impago' ? 'var(--color-red-dark)' : 'var(--color-amber-dark)' }}>{averia.sintoma}</div>
+              <div style={{ fontSize: 10, color: averia.estado === 'bloqueada_impago' ? 'var(--color-red-dark)' : 'var(--color-amber-dark)', marginTop: 4, fontWeight: 600 }}>Ver avería →</div>
+            </div>
+          ))}
 
           {/* Representantes */}
-          {datos.representantes.length > 0 && (
+          {datos.representantes?.length > 0 && (
             <div className="card">
               <div className="card-title">Representantes</div>
-              {datos.representantes.map(r => (
+              {datos.representantes.map((r: any) => (
                 <div key={r.dni} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, padding: '4px 0' }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{r.nombre} · {r.relacion}</span>
                   <span className={`pill ${r.autorizado ? 'pill-ok' : 'pill-neutral'}`} style={{ fontSize: 9 }}>
@@ -338,38 +309,6 @@ export function HomePage() {
             </div>
           )}
 
-          {/* RF-PI-01 RN-PI-07 — NBA solo si sin alertas críticas */}
-          {(datos as any).porfolio === 'fusion' && (() => {
-            const hayAlertaCritica =
-              datos.cobros.estadoGeneral === 'vencida' ||
-              datos.averias.some(a => a.estado !== 'resuelta') ||
-              datos.pedidos.some(p => p.estado === 'en_incidencia')
-
-            if (hayAlertaCritica) return (
-              <div style={{ padding: '10px 14px', borderRadius: 'var(--border-radius-lg)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)', fontSize: 11, color: 'var(--color-amber-dark)' }}>
-                ⚠ Propuesta comercial pausada — hay alertas críticas activas que requieren atención primero
-              </div>
-            )
-            return (
-              <div className="card fade-in" style={{ border: '1.5px solid #FB923C', background: '#FFF7ED' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#C2410C', marginBottom: 4 }}>
-                      🔄 Migración disponible — tu porfolio puede mejorar
-                    </div>
-                    <div style={{ fontSize: 11, color: '#9A3412' }}>
-                      Este cliente tiene Fusión. Puede migrar a mi Movistar y acceder a mejores condiciones.
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => navigate(`/cliente/${id}/venta`)}
-                    style={{ padding: '6px 14px', background: '#EA580C', color: '#fff', border: 'none', borderRadius: 'var(--border-radius-md)', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 12 }}>
-                    Gestionar →
-                  </button>
-                </div>
-              </div>
-            )
-          })()}
         </div>
       </div>
     </>

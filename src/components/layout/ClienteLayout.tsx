@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, useParams, useLocation, NavLink } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
-import { datosCliente } from '../../data/mockData'
+import { datosCliente, consumosPorCliente } from '../../data/mockData'
 
 function formatTiempo(seg: number) {
   const m = Math.floor(seg / 60).toString().padStart(2, '0')
@@ -457,49 +457,135 @@ export function ClienteLayout() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
           {/* ── CONTEXTO IVR FIJO DESPLEGABLE ── */}
-          {(cliente.cobros?.resumenVRU?.motivoDerivacion || cliente.identificadoPorIVR) && (
-            <div style={{ background: ivrAbierto ? 'var(--color-blue-light)' : 'var(--color-background-primary)', borderBottom: `1px solid ${ivrAbierto ? 'var(--color-blue-mid)' : 'var(--color-border-tertiary)'}`, flexShrink: 0, transition: 'all 0.2s' }}>
+          {cliente.ivr && (
+            <div style={{
+              background: 'white',
+              borderBottom: `1px solid ${ivrAbierto ? 'var(--color-border-secondary)' : 'var(--color-border-tertiary)'}`,
+              transition: 'all 0.2s',
+              flexShrink: 0,
+            }}>
+              {/* Barra colapsada — siempre visible */}
               <div
                 onClick={() => setIvrAbierto(!ivrAbierto)}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 14px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11 }}>📞</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-blue-dark)' }}>
-                    Contexto IVR
-                    {cliente.identificadoPorIVR && (
-                      <span style={{ marginLeft: 6, fontSize: 9, padding: '1px 5px', borderRadius: 'var(--border-radius-full)', background: 'var(--color-green-border)', color: '#fff', fontWeight: 700 }}>✓ IDENTIFICADO</span>
-                    )}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '7px 20px', cursor: 'pointer',
+                  background: 'white',
+                }}>
+                {/* Indicador llamada activa */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 9999, background: '#ffebee', border: '1px solid #ef9a9a', flexShrink: 0 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#e53935' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#b71c1c', fontFamily: 'monospace' }}>
+                    {formatTiempo(tiempoLlamada)}
                   </span>
-                  {!ivrAbierto && cliente.cobros?.resumenVRU?.motivoDerivacion && (
-                    <span style={{ fontSize: 11, color: 'var(--color-blue-dark)', opacity: 0.7 }}>· {cliente.cobros.resumenVRU.motivoDerivacion}</span>
-                  )}
                 </div>
-                <span style={{ fontSize: 10, color: 'var(--color-blue-dark)', opacity: 0.6 }}>
-                  {ivrAbierto ? '▲ Minimizar' : '▼ Ver contexto'}
+
+                {/* Motivo IVR */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                    {cliente.ivr.identificado ? '✓ IVR identificado' : '○ No identificado'}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'normal', lineHeight: 1.4 }}>
+                    {cliente.resumenNatural}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                    Espera: {cliente.ivr.tiempoEspera}
+                  </span>
+                </div>
+
+                {/* NPS inline */}
+                {cliente.nps && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '2px 8px',
+                    borderRadius: 9999, flexShrink: 0,
+                    background: cliente.nps.segmento === 'promotor' ? '#e8f5e9' : cliente.nps.segmento === 'detractor' ? '#ffebee' : '#fff8e1',
+                    border: `1px solid ${cliente.nps.segmento === 'promotor' ? '#a5d6a7' : cliente.nps.segmento === 'detractor' ? '#ef9a9a' : '#ffe082'}`,
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: cliente.nps.segmento === 'promotor' ? '#2e7d32' : cliente.nps.segmento === 'detractor' ? '#b71c1c' : '#f57f17' }}>
+                      NPS {cliente.nps.valor}
+                    </span>
+                    <span style={{ fontSize: 10, color: cliente.nps.segmento === 'promotor' ? '#2e7d32' : cliente.nps.segmento === 'detractor' ? '#b71c1c' : '#f57f17' }}>
+                      · {cliente.nps.segmento}
+                    </span>
+                  </div>
+                )}
+
+                {/* Flecha expand */}
+                <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', transition: 'transform 0.2s', display: 'inline-block', transform: ivrAbierto ? 'rotate(180deg)' : 'none', flexShrink: 0 }}>
+                  ▼
                 </span>
               </div>
+
+              {/* Panel expandido */}
               {ivrAbierto && (
-                <div style={{ padding: '0 14px 8px', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  {cliente.cobros?.resumenVRU?.motivoDerivacion && (
-                    <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
-                      <span style={{ fontWeight: 700 }}>Motivo derivación:</span> {cliente.cobros.resumenVRU.motivoDerivacion}
+                <div className="fade-in" style={{ padding: '12px 20px 14px', borderTop: '1px solid var(--color-border-tertiary)', background: 'var(--color-background-secondary)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+                    {[
+                      { label: 'Motivo IVR', val: cliente.ivr.motivo },
+                      { label: 'Submotivo', val: cliente.ivr.submotivo || '—' },
+                      { label: 'Canal', val: cliente.ivr.canal || 'Teléfono' },
+                      { label: 'Tiempo espera', val: cliente.ivr.tiempoEspera },
+                    ].map(r => (
+                      <div key={r.label} style={{ background: 'white', border: '1px solid var(--color-border-tertiary)', borderRadius: 6, padding: '8px 10px' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{r.label}</div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>{r.val}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* NPS expandido */}
+                  {cliente.nps && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'white', border: '1px solid var(--color-border-tertiary)', borderRadius: 6, marginBottom: 12 }}>
+                      <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: cliente.nps.segmento === 'promotor' ? '#2e7d32' : cliente.nps.segmento === 'detractor' ? '#e53935' : '#f57f17', lineHeight: 1 }}>
+                          {cliente.nps.valor}
+                        </div>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>/ 10</div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                          {[...Array(10)].map((_, i) => (
+                            <div key={i} style={{ flex: 1, height: 6, borderRadius: 2, background: i < cliente.nps!.valor ? (cliente.nps!.segmento === 'promotor' ? '#2e7d32' : cliente.nps!.segmento === 'detractor' ? '#e53935' : '#f57f17') : '#e0e0e0' }} />
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--color-text-tertiary)' }}>
+                          <span>Detractor</span><span>Pasivo</span><span>Promotor</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: cliente.nps.segmento === 'promotor' ? '#2e7d32' : cliente.nps.segmento === 'detractor' ? '#b71c1c' : '#f57f17', textTransform: 'capitalize' }}>{cliente.nps.segmento}</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{cliente.nps.fecha} · {cliente.nps.canal}</div>
+                      </div>
                     </div>
                   )}
-                  {(cliente.cobros?.resumenVRU?.intentosPago ?? 0) > 0 && (
-                    <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
-                      <span style={{ fontWeight: 700 }}>Intentos pago IVR:</span> {cliente.cobros.resumenVRU!.intentosPago} · {cliente.cobros.resumenVRU!.resultadoUltimoPago}
-                    </div>
-                  )}
-                  {(cliente.cobros?.resumenVRU?.llamadasHoy ?? 0) > 0 && (
-                    <div style={{ fontSize: 11, color: 'var(--color-blue-dark)' }}>
-                      <span style={{ fontWeight: 700 }}>Llamadas hoy:</span> {cliente.cobros.resumenVRU!.llamadasHoy}
-                    </div>
-                  )}
-                  {cliente.identificadoPorIVR && (
-                    <div style={{ fontSize: 11, color: 'var(--color-green-dark)', fontWeight: 600 }}>
-                      ✓ Cliente identificado por IVR antes de la llamada
-                    </div>
-                  )}
+
+                  {/* Alertas contextuales automáticas */}
+                  {(() => {
+                    const alertasCtx = []
+                    if (cliente.reclamaciones?.some(r => r.estado === 'abierta' || r.estado === 'en_gestion')) {
+                      alertasCtx.push({ txt: 'Reclamación activa — no ofertar hasta resolución', color: '#b71c1c', bg: '#ffebee', border: '#ef9a9a' })
+                    }
+                    const consumosAnomalos = consumosPorCliente[id || '']?.filter((c) => c.anomalo)
+                    if (consumosAnomalos?.length > 0) {
+                      const total = consumosAnomalos.reduce((a, c) => a + c.importe, 0)
+                      alertasCtx.push({ txt: `${consumosAnomalos.length} consumos anómalos detectados · ${total.toFixed(2)}€ en disputa`, color: '#e65100', bg: '#fff3e0', border: '#ffcc80' })
+                    }
+                    if (cliente.cobros?.estadoGeneral === 'vencida') {
+                      alertasCtx.push({ txt: `Deuda vencida ${cliente.cobros.deudaTotal.toFixed(2)}€ — gestionar en Cobros`, color: '#b71c1c', bg: '#ffebee', border: '#ef9a9a' })
+                    }
+                    if (alertasCtx.length === 0) return null
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        {alertasCtx.map((a, i) => (
+                          <div key={i} style={{ padding: '6px 10px', borderRadius: 6, background: a.bg, border: `1px solid ${a.border}`, fontSize: 11, color: a.color, fontWeight: 500 }}>
+                            ⚠ {a.txt}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>

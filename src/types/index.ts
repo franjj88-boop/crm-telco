@@ -1,5 +1,20 @@
 // ─── CLIENTE ─────────────────────────────────────────────────────────────────
 
+export interface IVRContexto {
+  motivo: string
+  submotivo?: string
+  tiempoEspera: string
+  identificado: boolean
+  canal?: string
+}
+
+export interface NPS {
+  valor: number
+  segmento: 'detractor' | 'pasivo' | 'promotor'
+  fecha: string
+  canal: string
+}
+
 export type SatisfaccionRiesgo = 'ok' | 'en_riesgo' | 'critico'
 export type Canal = 'telefono' | 'tienda' | 'chat' | 'whatsapp' | 'email'
 export type PerfilAgente = '1004' | 'tienda' | 'cobros' | 'backoffice'
@@ -41,6 +56,8 @@ export interface Cliente {
   representantes: Representante[]
   iban?: string
   estadoCliente?: 'activo' | 'baja' | 'suspendido'
+  ivr?: IVRContexto
+  nps?: NPS
 }
 
 export interface ProximoEvento {
