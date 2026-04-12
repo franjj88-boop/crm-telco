@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { datosCliente } from '../../data/mockData'
 
@@ -100,6 +100,21 @@ export function ReclamacionesPage() {
   const [facturasMulti, setFacturasMulti] = useState<string[]>(facturasIniciales)
   const [evidencias, setEvidencias] = useState<{ nombre: string; tipo: string }[]>([])
   const [motivoCodificado, setMotivoCodificado] = useState<{ motivo: string; submotivo: string } | null>(null)
+  const [envioCanal, setEnvioCanal] = useState('Email')
+  const [contactoValidado, setContactoValidado] = useState(() => {
+    const d = id ? datosCliente[id] : null
+    return d?.email || ''
+  })
+
+  useEffect(() => {
+    const d = id ? datosCliente[id] : null
+    if (!d) return
+    if (envioCanal === 'SMS') {
+      setContactoValidado(d.telefono || '')
+    } else {
+      setContactoValidado(d.email || '')
+    }
+  }, [envioCanal, id])
 
   if (!id) return null
   const datos = datosCliente[id]
@@ -423,7 +438,7 @@ export function ReclamacionesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Canal de resolución</div>
-                  <select className="input" style={{ fontSize: 11 }}>
+                  <select className="input" style={{ fontSize: 11 }} value={envioCanal} onChange={e => setEnvioCanal(e.target.value)}>
                     <option>Email</option>
                     <option>SMS</option>
                     <option>Email + SMS</option>
@@ -436,7 +451,8 @@ export function ReclamacionesPage() {
                     <input
                       className="input"
                       style={{ fontSize: 11, flex: 1 }}
-                      defaultValue={datos.email}
+                      value={contactoValidado}
+                      onChange={e => setContactoValidado(e.target.value)}
                       placeholder="Email o teléfono"
                     />
                   </div>
