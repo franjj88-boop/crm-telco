@@ -456,8 +456,48 @@ export function ClienteLayout() {
         {/* ── CONTENIDO PRINCIPAL ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-          {/* ── CONTEXTO IVR FIJO DESPLEGABLE ── */}
-          {cliente.ivr && (
+          {/* ── CONTEXTO IVR / TIENDA FIJO DESPLEGABLE ── */}
+          {(cliente as any).canalContacto?.tipo === 'tienda' ? (
+            <div
+              onClick={() => setIvrAbierto(!ivrAbierto)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '7px 20px', cursor: 'pointer',
+                background: 'white', borderBottom: '1px solid var(--color-border-tertiary)',
+                flexShrink: 0,
+              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 9999, background: 'var(--color-blue-light)', border: '1px solid var(--color-blue-mid)', flexShrink: 0 }}>
+                <span style={{ fontSize: 11 }}>🏪</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-blue-dark)' }}>
+                  Tienda · Turno {(cliente as any).canalContacto.turno}
+                </span>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                {(cliente as any).canalContacto.intencion}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                Llegada: {(cliente as any).canalContacto.horaLlegada}
+              </span>
+              {cliente.nps && (
+                <div style={{
+                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '2px 8px', borderRadius: 9999, flexShrink: 0,
+                  background: cliente.nps.segmento === 'promotor' ? 'var(--color-green-light)' : cliente.nps.segmento === 'detractor' ? 'var(--color-red-light)' : 'var(--color-amber-light)',
+                  border: `1px solid ${cliente.nps.segmento === 'promotor' ? 'var(--color-green-border)' : cliente.nps.segmento === 'detractor' ? 'var(--color-red-border)' : 'var(--color-amber-border)'}`,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: cliente.nps.segmento === 'promotor' ? 'var(--color-green-dark)' : cliente.nps.segmento === 'detractor' ? 'var(--color-red-dark)' : 'var(--color-amber-dark)' }}>
+                    NPS {cliente.nps.valor}
+                  </span>
+                  <span style={{ fontSize: 10, color: cliente.nps.segmento === 'promotor' ? 'var(--color-green-dark)' : cliente.nps.segmento === 'detractor' ? 'var(--color-red-dark)' : 'var(--color-amber-dark)' }}>
+                    · {cliente.nps.segmento}
+                  </span>
+                </div>
+              )}
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', transition: 'transform 0.2s', display: 'inline-block', transform: ivrAbierto ? 'rotate(180deg)' : 'none', flexShrink: 0 }}>▼</span>
+            </div>
+          ) : cliente.ivr ? (
             <div style={{
               background: 'white',
               borderBottom: `1px solid ${ivrAbierto ? 'var(--color-border-secondary)' : 'var(--color-border-tertiary)'}`,
@@ -589,7 +629,7 @@ export function ClienteLayout() {
                 </div>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* Tabs */}
           <div style={{ background: 'var(--color-background-primary)', borderBottom: '1px solid var(--color-border-tertiary)', padding: '0 14px', display: 'flex', alignItems: 'center', overflowX: 'auto', flexShrink: 0 }}>

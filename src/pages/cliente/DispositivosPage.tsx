@@ -8,11 +8,11 @@ type Categoria = 'todos' | 'smartphone' | 'tablet' | 'tv' | 'wearable'
 type Orden = 'recomendado' | 'precio_asc' | 'precio_desc'
 
 // ── Packs/cross-selling proactivo (RF06-1) ──
-const packsRelacionados: Record<string, { nombre: string; descuento: number; icono: string }[]> = {
-  'd2': [{ nombre: 'Apple Watch Series 9', descuento: 50, icono: '⌚' }],
-  'd3': [{ nombre: 'Apple Watch Series 9', descuento: 80, icono: '⌚' }, { nombre: 'AirPods Pro', descuento: 30, icono: '🎧' }],
-  'd1': [{ nombre: 'Galaxy Watch 6', descuento: 40, icono: '⌚' }],
-  'd5': [{ nombre: 'Auriculares Xiaomi', descuento: 20, icono: '🎧' }],
+const ofertasCombinadas: Record<string, { productoId: string; nombre: string; icono: string; precioNormal: number; descuento: number }[]> = {
+  'd2': [{ productoId: 'watch-s9', nombre: 'Apple Watch Series 9', icono: '⌚', precioNormal: 399, descuento: 50 }],
+  'd3': [{ productoId: 'watch-s9', nombre: 'Apple Watch Series 9', icono: '⌚', precioNormal: 399, descuento: 80 }, { productoId: 'airpods-pro', nombre: 'AirPods Pro', icono: '🎧', precioNormal: 249, descuento: 30 }],
+  'd1': [{ productoId: 'watch-g6', nombre: 'Galaxy Watch 6', icono: '⌚', precioNormal: 299, descuento: 40 }],
+  'd5': [{ productoId: 'auri-xm', nombre: 'Auriculares Xiaomi', icono: '🎧', precioNormal: 79, descuento: 20 }],
 }
 
 // ── PVPR simulado (RF04-1) ──
@@ -46,6 +46,7 @@ export function DispositivosPage({ modoNuevoCliente = false, onSeleccionar }: Di
   // RF08-2 — Opciones post-selección
   const [seguroSeleccionado, setSeguroSeleccionado] = useState(false)
   const [recompraSeleccionada, setRecompraSeleccionada] = useState(false)
+  const [combosSeleccionados, setCombosSeleccionados] = useState<string[]>([])
 
   // RF07-1 — GDR
   const [solicitandoGDR, setSolicitandoGDR] = useState(false)
@@ -114,6 +115,7 @@ export function DispositivosPage({ modoNuevoCliente = false, onSeleccionar }: Di
     setModalidadDetalle('mensual')
     setSeguroSeleccionado(false)
     setRecompraSeleccionada(false)
+    setCombosSeleccionados([])
   }
 
   return (
@@ -243,7 +245,7 @@ export function DispositivosPage({ modoNuevoCliente = false, onSeleccionar }: Di
 
       {/* ── RF06-1: PACKS / CROSS-SELLING PROACTIVO ── */}
       {seleccionado === null && enCesta.length === 0 && (() => {
-        const packsDestacados = Object.entries(packsRelacionados).slice(0, 1)
+        const packsDestacados = Object.entries(ofertasCombinadas).slice(0, 1)
         const dispBase = catalogoDispositivos.find(d => d.id === packsDestacados[0]?.[0])
         const packs = packsDestacados[0]?.[1] || []
         if (!dispBase || packs.length === 0) return null
@@ -277,7 +279,7 @@ export function DispositivosPage({ modoNuevoCliente = false, onSeleccionar }: Di
           const enCestaYa = !!enCesta.find(c => c.id === d.id)
           const pvpr = pvprDispositivos[d.id] || d.precioLibre
           const ahorroVsPVPR = pvpr - d.precioLibre
-          const packs = packsRelacionados[d.id] || []
+          const packs = ofertasCombinadas[d.id] || []
 
           return (
             <div key={d.id}
@@ -441,15 +443,32 @@ export function DispositivosPage({ modoNuevoCliente = false, onSeleccionar }: Di
             </div>
 
             {/* RF06-1 — Cross-selling contextual tras seleccionar */}
-            {packsRelacionados[seleccionado.id] && (
+            {ofertasCombinadas[seleccionado.id]?.length > 0 && (
               <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--color-amber-light)', border: '1px solid var(--color-amber-border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 6 }}>🎁 Oferta combinada disponible</div>
-                {packsRelacionados[seleccionado.id].map((p, i) => (
-                  <div key={i} style={{ fontSize: 11, color: 'var(--color-amber-dark)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <span>{p.icono}</span>
-                    <span>Añade <strong>{p.nombre}</strong> con <strong>{p.descuento}€ de descuento</strong> al comprar este dispositivo</span>
-                  </div>
-                ))}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-amber-dark)', marginBottom: 8 }}>🎁 Oferta combinada disponible</div>
+                {ofertasCombinadas[seleccionado.id].map(p => {
+                  const sel = combosSeleccionados.includes(p.productoId)
+                  return (
+                    <div key={p.productoId}
+                      onClick={() => setCombosSeleccionados(sel ? combosSeleccionados.filter(id => id !== p.productoId) : [...combosSeleccionados, p.productoId])}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', marginBottom: 4, border: `1.5px solid ${sel ? 'var(--color-amber-border)' : 'rgba(0,0,0,0.08)'}`, borderRadius: 'var(--border-radius-md)', background: sel ? 'rgba(255,255,255,0.5)' : 'transparent', cursor: 'pointer', transition: 'all 0.1s' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16 }}>{p.icono}</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-amber-dark)' }}>{p.nombre}</div>
+                          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                            <span style={{ textDecoration: 'line-through', marginRight: 4 }}>{p.precioNormal}€</span>
+                            <span style={{ fontWeight: 700, color: 'var(--color-amber-dark)' }}>{p.precioNormal - p.descuento}€</span>
+                            <span style={{ marginLeft: 4, color: 'var(--color-green-dark)', fontWeight: 700 }}>−{p.descuento}€</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sel ? 'var(--color-amber-border)' : 'var(--color-border-secondary)'}`, background: sel ? 'var(--color-amber-mid)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {sel && <span style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>✓</span>}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
 
@@ -518,23 +537,53 @@ export function DispositivosPage({ modoNuevoCliente = false, onSeleccionar }: Di
                   </div>
                 )}
 
-                {esClienteExistente && modalidadDetalle !== 'libre' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)', borderTop: '1px solid var(--color-green-border)', paddingTop: 6, marginTop: 6 }}>
-                    <span>Nueva cuota total</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>
-                      {((parqueActualPrecio + (modalidadDetalle === 'rtr' ? seleccionado.precioMensual * 0.7 : seleccionado.precioMensual) + (seguroSeleccionado ? 5.99 : 0)) * 1.21).toFixed(2)}€/mes
-                    </span>
-                  </div>
-                )}
+                {combosSeleccionados.map(productoId => {
+                  const oferta = ofertasCombinadas[seleccionado.id]?.find(o => o.productoId === productoId)
+                  if (!oferta) return null
+                  const precioFinal = oferta.precioNormal - oferta.descuento
+                  const cuotaMensual = (precioFinal / 24).toFixed(2)
+                  return (
+                    <div key={productoId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-green-dark)', marginBottom: 3 }}>
+                      <span>
+                        {oferta.icono} {oferta.nombre}
+                        <span style={{ fontSize: 10, color: 'var(--color-green-dark)', fontWeight: 600, marginLeft: 4 }}>−{oferta.descuento}€</span>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>(24 cuotas)</span>
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>+{cuotaMensual}€/mes</span>
+                    </div>
+                  )
+                })}
 
-                {!esClienteExistente && modalidadDetalle !== 'libre' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)', borderTop: '1px solid var(--color-green-border)', paddingTop: 6, marginTop: 6 }}>
-                    <span>Cuota dispositivo (c/IVA)</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>
-                      {((modalidadDetalle === 'rtr' ? seleccionado.precioMensual * 0.7 : seleccionado.precioMensual) * 1.21 + (seguroSeleccionado ? 5.99 : 0)).toFixed(2)}€/mes
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const totalCombos = combosSeleccionados.reduce((acc, productoId) => {
+                    const oferta = ofertasCombinadas[seleccionado.id]?.find(o => o.productoId === productoId)
+                    if (!oferta) return acc
+                    return acc + (oferta.precioNormal - oferta.descuento) / 24
+                  }, 0)
+                  const cuotaDispositivo = modalidadDetalle === 'rtr' ? seleccionado.precioMensual * 0.7 : seleccionado.precioMensual
+                  const seguro = seguroSeleccionado ? 5.99 : 0
+
+                  return (
+                    <>
+                      {esClienteExistente && modalidadDetalle !== 'libre' && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)', borderTop: '1px solid var(--color-green-border)', paddingTop: 6, marginTop: 6 }}>
+                          <span>Nueva cuota total</span>
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>
+                            {((parqueActualPrecio + cuotaDispositivo + totalCombos + seguro) * 1.21).toFixed(2)}€/mes
+                          </span>
+                        </div>
+                      )}
+                      {!esClienteExistente && modalidadDetalle !== 'libre' && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--color-green-dark)', borderTop: '1px solid var(--color-green-border)', paddingTop: 6, marginTop: 6 }}>
+                          <span>Cuota dispositivo (c/IVA)</span>
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>
+                            {((cuotaDispositivo + totalCombos) * 1.21 + seguro).toFixed(2)}€/mes
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
 
                 {/* RF09-1 — Guión verbalización */}
                 <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(255,255,255,0.6)', border: '1px solid var(--color-green-border)', fontSize: 11, color: 'var(--color-green-dark)', fontStyle: 'italic', lineHeight: 1.6 }}>

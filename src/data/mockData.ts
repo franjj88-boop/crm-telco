@@ -1055,6 +1055,110 @@ export const datosCliente: Record<string, Cliente> = {
       fecha: 'hace 6 semanas',
       canal: 'Encuesta post-llamada',
     },
+  },
+
+  'CRM-005': {
+    id: 'CRM-005',
+    crmId: 'CRM-005',
+    nombre: 'Antonio',
+    apellidos: 'Molina Herrera',
+    dni: '34821956P',
+    email: 'antonio.molina@gmail.com',
+    telefono: '666 321 789',
+    iban: 'ES76 2100 0418 4502 0005 9871',
+    direccion: 'Calle Alcalá 78, 2ºA',
+    cp: '28009',
+    ciudad: 'Madrid',
+    porfolio: 'fusion',
+    bundleActual: 'cv1-300-20',
+    satisfaccionRiesgo: 'ok',
+    identificadoPorIVR: false,
+    riesgoScore: 'bajo',
+    resumenNatural: 'Cliente con porfolio Fusión descatalogado. Viene a tienda a migrar a mi Movistar y valorar un terminal nuevo. Buen historial de pago. Sin incidencias activas.',
+    canalContacto: {
+      tipo: 'tienda',
+      turno: 'B-012',
+      intencion: 'Contratación / Migración',
+      horaLlegada: '10:45',
+    },
+    proximosEventos: [
+      { id: 'pe1', tipo: 'fin_permanencia', descripcion: 'Fin de permanencia Fusión — baja libre posible', fecha: 'Jun 2026', impacto: 'negativo' },
+    ],
+    representantes: [],
+    productos: [
+      { id: 'p1', nombre: 'Fusión 300Mb + 20GB', tipo: 'fibra', estado: 'activa', precio: 44.90 },
+      { id: 'p2', nombre: '666 321 789 · M 20GB', tipo: 'movil', estado: 'activa', precio: 0 },
+    ],
+    lineasMovil: [
+      {
+        id: 'lm1', numero: '666 321 789', tarifa: 'M 20GB', estado: 'activa', titularidad: 'titular',
+        consumoMes: {
+          datosUsadosMB: 14336, datosTotalesMB: 20480,
+          llamadasMinutos: 210, smsEnviados: 8,
+          roamingActivo: false, fechaReset: '01/04/2026',
+          enVuelo: { datosRestantesMB: 6144, diasRestantesCiclo: 8, alertaConsumo: false }
+        },
+        addons: []
+      }
+    ],
+    facturas: [
+      {
+        id: 'FAC-AM-001', numero: 'FAC-AM-001', periodo: 'Marzo 2026',
+        fechaEmision: '01/04/2026', fechaVencimiento: '15/04/2026',
+        importe: 44.90, estado: 'pagada',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
+        conceptos: [
+          { id: 'c1', descripcion: 'Cuota Fusión 300Mb + 20GB', tipo: 'cuota', importe: 44.90 },
+        ],
+      },
+      {
+        id: 'FAC-AM-002', numero: 'FAC-AM-002', periodo: 'Febrero 2026',
+        fechaEmision: '01/03/2026', fechaVencimiento: '15/03/2026',
+        importe: 44.90, estado: 'pagada',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
+        conceptos: [
+          { id: 'c2', descripcion: 'Cuota Fusión 300Mb + 20GB', tipo: 'cuota', importe: 44.90 },
+        ],
+      },
+      {
+        id: 'FAC-AM-003', numero: 'FAC-AM-003', periodo: 'Enero 2026',
+        fechaEmision: '01/02/2026', fechaVencimiento: '15/02/2026',
+        importe: 44.90, estado: 'pagada',
+        juridica: 'Telefónica de España SAU', juridicaId: 'A' as const,
+        conceptos: [
+          { id: 'c3', descripcion: 'Cuota Fusión 300Mb + 20GB', tipo: 'cuota', importe: 44.90 },
+        ],
+      },
+    ],
+    cobros: {
+      deudaTotal: 0,
+      estadoGeneral: 'en_plazo',
+      riesgo: 'bajo',
+      cedidaEGC: false,
+      deudaIncobrable: false,
+      saldoAFavor: 0,
+      facturasConDeuda: [],
+    },
+    reclamaciones: [],
+    averias: [],
+    pedidos: [],
+    historial: [
+      { id: 'h1', fecha: '12/04/2026', canal: 'Tienda', motivo: 'Migración Fusión → mi Movistar + terminal nuevo', causaAgrupacion: 'Venta', resolucion: '', agente: 'TDA-001', duracion: '—', resuelto: false },
+    ],
+    nps: {
+      valor: 6,
+      segmento: 'pasivo' as const,
+      fecha: 'hace 2 meses',
+      canal: 'Encuesta post-llamada',
+    },
+    ivr: {
+      motivo: 'Contratación / Migración',
+      submotivo: 'Migración Fusión a mi Movistar + valorar terminal',
+      tiempoEspera: '0min 00s',
+      identificado: true,
+      canal: 'Tienda',
+    },
+    senalizacionesParque: [],
   }
 }
 
@@ -1293,6 +1397,7 @@ export const clientesLista: { id: string; nombre: string; dni: string; telefono:
   { id: 'CRM-002', nombre: 'Carlos Ruiz Martín', dni: '87654321B', telefono: '654 892 001', direccion: 'Avda. Castellana, 120 5ºA', lineas: ['654 892 001'], satisfaccionRiesgo: 'critico' },
   { id: 'CRM-003', nombre: 'Empresa Técnica SL', dni: 'B12345678', telefono: '912 345 678', direccion: 'C/ Serrano, 45 2ºD', lineas: ['600 001 001', '600 001 002', '600 001 003'], satisfaccionRiesgo: 'ok' },
   { id: 'CRM-004', nombre: 'Luisa Jiménez Moreno', dni: '52847391K', telefono: '677 234 891', direccion: 'Calle Serrano 112, 3ºB, Madrid', lineas: ['677 234 891'], satisfaccionRiesgo: 'ok' },
+  { id: 'CRM-005', nombre: 'Antonio Molina Herrera', dni: '34821956P', telefono: '666 321 789', direccion: 'Calle Alcalá 78, 2ºA', lineas: ['666 321 789'], satisfaccionRiesgo: 'ok' },
 ]
 
 // ── FOCOS COMERCIALES ──
@@ -1397,5 +1502,10 @@ export const propuestasNBA: Record<string, {
     { id: 'n1', titulo: 'Subida a 600Mb + 30GB', descripcion: 'El doble de velocidad por solo 10€/mes más. Sin permanencia.', tipo: 'tarifa', impactoMensual: 10, prioridad: 1, destino: 'venta' },
     { id: 'n2', titulo: 'FTTR — Fibra hasta la habitación', descripcion: 'Extiende la fibra óptica a cada habitación del hogar.', tipo: 'servicio', impactoMensual: 12, prioridad: 2, destino: 'venta' },
     { id: 'n3', titulo: 'Seguro de Móvil Plus', descripcion: 'Cobertura total rotura, robo y líquidos desde 5.99€/mes.', tipo: 'servicio', impactoMensual: 5.99, prioridad: 3, destino: 'dispositivos' },
+  ],
+  'CRM-005': [
+    { id: 'n1', titulo: 'Migración a mi Movistar 600Mb + Ilimitado', descripcion: 'Fibra doble de velocidad y datos ilimitados. Porfolio Fusión descatalogado — momento ideal para migrar.', tipo: 'tarifa', impactoMensual: 10, prioridad: 1, destino: 'venta' },
+    { id: 'n2', titulo: 'Samsung Galaxy S24 desde 37.46€/mes', descripcion: 'Sin terminal actual. Financiación 24 meses sin intereses. Compatible con la nueva tarifa.', tipo: 'dispositivo', impactoMensual: 37.46, prioridad: 2, destino: 'dispositivos' },
+    { id: 'n3', titulo: 'FTTR — Fibra hasta la habitación', descripcion: 'Perfil ideal para su domicilio. Instalación incluida con la migración.', tipo: 'servicio', impactoMensual: 12, prioridad: 3, destino: 'venta' },
   ],
 }

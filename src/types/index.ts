@@ -58,6 +58,14 @@ export interface Cliente {
   estadoCliente?: 'activo' | 'baja' | 'suspendido'
   ivr?: IVRContexto
   nps?: NPS
+  canalContacto?: CanalContacto
+}
+
+export interface CanalContacto {
+  tipo: 'telefono' | 'tienda' | 'chat'
+  turno?: string
+  intencion?: string
+  horaLlegada?: string
 }
 
 export interface ProximoEvento {
