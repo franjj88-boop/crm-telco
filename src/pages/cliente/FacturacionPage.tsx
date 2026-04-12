@@ -1455,7 +1455,7 @@ export function FacturacionPage() {
                               } else {
                                 setConceptosReclamacion(prev => [...prev, {
                                   conceptoId: c.id,
-                                  facturaId: facturaActiva!,
+                                  facturaId: factura!.id,
                                   facturaPeriodo: factura?.periodo || '',
                                   descripcion: c.descripcion,
                                   importe: c.importe,

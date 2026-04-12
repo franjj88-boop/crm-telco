@@ -75,7 +75,6 @@ export function ReclamacionesPage() {
   const [formCanal, setFormCanal] = useState('Teléfono')
   const [formImporte, setFormImporte] = useState(stateInicial?.importeTotal?.toString() || '')
   const [formFactura, setFormFactura] = useState(stateInicial?.facturasIds?.[0] || '')
-  const [facturasMulti, setFacturasMulti] = useState<string[]>(stateInicial?.facturasIds || [])
   const [formComentarioAgente, setFormComentarioAgente] = useState('')
   const [mostrarComms, setMostrarComms] = useState<string | null>(null)
   const [filtroLinea, setFiltroLinea] = useState<string>('todas')
@@ -90,9 +89,14 @@ export function ReclamacionesPage() {
   const [accionEjecutada, setAccionEjecutada] = useState<{ tipo: string; detalle: string } | null>(null)
 
   // RF-18 — Multi-factura y autocodificación
-  const [modoMultiFactura, setModoMultiFactura] = useState(
-    (stateInicial?.facturasIds?.length || 0) > 1
-  )
+  const facturasIniciales = (() => {
+    if (stateInicial?.facturasIds?.length > 0) return stateInicial.facturasIds
+    if (stateInicial?.facturaId) return [stateInicial.facturaId]
+    return []
+  })()
+
+  const [modoMultiFactura, setModoMultiFactura] = useState(facturasIniciales.length > 0)
+  const [facturasMulti, setFacturasMulti] = useState<string[]>(facturasIniciales)
   const [evidencias, setEvidencias] = useState<{ nombre: string; tipo: string }[]>([])
   const [motivoCodificado, setMotivoCodificado] = useState<{ motivo: string; submotivo: string } | null>(null)
 
