@@ -15,6 +15,7 @@ type DatosCobertura = {
 type DatosCliente = {
   dni: string; nombre: string; apellidos: string
   email: string; telefono: string; iban: string; nacionalidad: string; idioma: string
+  formatoFactura?: string; apoyo?: string; vulnerable?: boolean; direccionHabitual?: string
 }
 type DatosProvision = {
   citaFecha: string; citaFranja: string
@@ -117,9 +118,14 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
   })
   const [scoring, setScoring] = useState<boolean | null>(clientePreCargado?.scoringOK ? true : null)
   const [scoringCargando, setScoringCargando] = useState(false)
+  const [editandoDireccionHabitual, setEditandoDireccionHabitual] = useState(false)
 
   // Provisión paso 4
   const [prov, setProv] = useState<DatosProvision>({ citaFecha: '', citaFranja: '', sim: 'fisica', entrega: 'domicilio' })
+  const [mostrarCalendario, setMostrarCalendario] = useState(false)
+  const [iccSim, setIccSim] = useState('')
+  const [direccionEnvio, setDireccionEnvio] = useState('')
+  const [editandoDireccionEnvio, setEditandoDireccionEnvio] = useState(false)
 
   // Firma paso 5
   const [firmando, setFirmando] = useState(false)
@@ -183,7 +189,11 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
   const ejecutarScoring = () => {
     if (!validarDNI(datos.dni)) return
     setScoringCargando(true); setScoring(null)
-    setTimeout(() => { setScoring(!datos.dni.startsWith('0')); setScoringCargando(false) }, 1800)
+    setTimeout(() => {
+      const ko = datos.dni.toUpperCase().endsWith('A')
+      setScoring(!ko)
+      setScoringCargando(false)
+    }, 1800)
   }
 
   const paso1OK = tipoAlta !== null
@@ -811,6 +821,48 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                 </div>
               )}
 
+              {/* DNI opcional — aparece tras seleccionar bundle */}
+              {bundleSel && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>
+                    Identificación del cliente <span style={{ fontSize: 13, fontWeight: 400, color: '#9CA3AF' }}>(opcional)</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 14 }}>
+                    Introduce el DNI ahora para agilizar el proceso. Podrás introducirlo también en el paso de datos.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input
+                      className="input"
+                      style={{ height: 44, flex: 1, borderColor: datos.dni && !validarDNI(datos.dni) ? '#EF4444' : undefined }}
+                      placeholder="12345678A (opcional)"
+                      value={datos.dni}
+                      onChange={e => { setDatos(p => ({ ...p, dni: e.target.value.toUpperCase() })); setScoring(null) }}
+                    />
+                    {validarDNI(datos.dni) && (
+                      <button
+                        onClick={ejecutarScoring}
+                        disabled={scoringCargando}
+                        style={{ padding: '0 20px', background: scoring === true ? '#16A34A' : scoring === false ? '#DC2626' : BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {scoringCargando ? '⏳...' : scoring === true ? '✓ Apto' : scoring === false ? '✕ No apto' : 'Pre-scoring →'}
+                      </button>
+                    )}
+                  </div>
+                  {datos.dni && !validarDNI(datos.dni) && (
+                    <div style={{ fontSize: 11, color: '#EF4444', marginTop: 4 }}>Formato inválido — 8 dígitos + 1 letra</div>
+                  )}
+                  {scoring === true && (
+                    <div style={{ marginTop: 8, padding: '6px 10px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6, fontSize: 12, color: '#166534', fontWeight: 600 }}>
+                      ✓ Pre-scoring OK — cliente apto para continuar
+                    </div>
+                  )}
+                  {scoring === false && (
+                    <div style={{ marginTop: 8, padding: '6px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, fontSize: 12, color: '#991B1B', fontWeight: 600 }}>
+                      ✕ Pre-scoring KO — revisar antes de continuar con dispositivos
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Add-ons TV — RF01-2 filtrado por porfolio + RF01-3 Ver más */}
               {bundleSel && bundleSel.categoria !== 'fibra_sola' && (() => {
                 // Nuevo cliente → siempre mi_movistar (catálogo completo)
@@ -1121,81 +1173,150 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
               <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 20 }}>Datos del cliente</div>
 
-                {/* DNI + Scoring */}
-                <div style={{ marginBottom: 20, padding: '16px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>DNI / NIE / Pasaporte *</div>
-                  <input className="input" placeholder="12345678A" value={datos.dni}
-                    onChange={e => { setDatos(p => ({ ...p, dni: e.target.value.toUpperCase() })); setScoring(null) }}
-                    style={{ marginBottom: 8, height: 44, borderColor: datos.dni && !validarDNI(datos.dni) ? '#EF4444' : undefined }}
-                  />
-                  {datos.dni && !validarDNI(datos.dni) && <div style={{ fontSize: 11, color: '#EF4444', marginBottom: 8 }}>Formato inválido — 8 dígitos + 1 letra</div>}
-                  {clientePreCargado?.scoringOK ? (
-                    <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534', fontWeight: 600 }}>
-                      ✓ Scoring OK — Cliente verificado previamente
-                    </div>
-                  ) : (
-                    <button onClick={ejecutarScoring} disabled={!validarDNI(datos.dni) || scoringCargando}
-                      style={{ width: '100%', padding: '10px', background: scoring === true ? '#16A34A' : scoring === false ? '#DC2626' : BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!validarDNI(datos.dni) || scoringCargando) ? 0.6 : 1 }}>
-                      {scoringCargando ? '⏳ Verificando scoring...' : scoring === true ? '✓ Scoring OK — Apto para contratar' : scoring === false ? '✕ Scoring KO — No apto' : '🔍 Ejecutar scoring de riesgo'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Formulario datos — solo si scoring OK */}
-                {scoring === true && (
-                  <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {clientePreCargado && (
-                      <div style={{ padding: '10px 14px', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 8, fontSize: 12, color: '#0033A0', fontWeight: 600 }}>
-                        ✓ Datos precargados del cliente — revisa y confirma antes de continuar
-                      </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nombre *</div>
-                        <input className="input" style={{ height: 44 }} placeholder="Nombre" value={datos.nombre} onChange={e => setDatos(p => ({ ...p, nombre: e.target.value }))} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Apellidos *</div>
-                        <input className="input" style={{ height: 44 }} placeholder="Apellidos" value={datos.apellidos} onChange={e => setDatos(p => ({ ...p, apellidos: e.target.value }))} />
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email *</div>
-                        <input className="input" style={{ height: 44, borderColor: datos.email && !validarEmail(datos.email) ? '#EF4444' : undefined }}
-                          placeholder="email@ejemplo.com" value={datos.email} onChange={e => setDatos(p => ({ ...p, email: e.target.value }))} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Teléfono *</div>
-                        <input className="input" style={{ height: 44, borderColor: datos.telefono && !validarTel(datos.telefono) ? '#EF4444' : undefined }}
-                          placeholder="612 345 678" value={datos.telefono} onChange={e => setDatos(p => ({ ...p, telefono: e.target.value }))} />
-                        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 3 }}>Te enviaremos un SMS para confirmar el pedido</div>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>IBAN — Cuenta para domiciliación *</div>
-                      <input className="input" style={{ height: 44, borderColor: datos.iban && !validarIBAN(datos.iban) ? '#EF4444' : undefined }}
-                        placeholder="ES91 2100 0418 4502 0005 1332" value={datos.iban} onChange={e => setDatos(p => ({ ...p, iban: e.target.value.toUpperCase() }))} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nacionalidad</div>
-                        <select className="input" style={{ height: 44 }} value={datos.nacionalidad} onChange={e => setDatos(p => ({ ...p, nacionalidad: e.target.value }))}>
-                          {['Española', 'Europea', 'Iberoamericana', 'Otra'].map(n => <option key={n}>{n}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Idioma</div>
-                        <select className="input" style={{ height: 44 }} value={datos.idioma} onChange={e => setDatos(p => ({ ...p, idioma: e.target.value }))}>
-                          {['Castellano', 'Catalán', 'Euskera', 'Gallego', 'Inglés'].map(i => <option key={i}>{i}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ padding: '10px 14px', background: '#F9FAFB', borderRadius: 8, fontSize: 12, color: '#6B7280' }}>
-                      💡 La factura se enviará digitalmente al email indicado por defecto.
-                    </div>
+                {clientePreCargado && (
+                  <div style={{ marginBottom: 16, padding: '10px 14px', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 8, fontSize: 12, color: '#0033A0', fontWeight: 600 }}>
+                    ✓ Datos precargados del cliente — revisa y confirma antes de continuar
                   </div>
                 )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                    {/* Bloque: Datos principales */}
+                    <div style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Datos principales</div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>DNI / NIE / Pasaporte *</div>
+                        <input className="input" placeholder="12345678A" value={datos.dni}
+                          onChange={e => { setDatos(p => ({ ...p, dni: e.target.value.toUpperCase() })); setScoring(null) }}
+                          style={{ height: 44, borderColor: datos.dni && !validarDNI(datos.dni) ? '#EF4444' : undefined }}
+                        />
+                        {datos.dni && !validarDNI(datos.dni) && (
+                          <div style={{ fontSize: 11, color: '#EF4444', marginTop: 4 }}>Formato inválido — 8 dígitos + 1 letra</div>
+                        )}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nombre *</div>
+                          <input className="input" style={{ height: 44 }} placeholder="Nombre" value={datos.nombre} onChange={e => setDatos(p => ({ ...p, nombre: e.target.value }))} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Apellidos *</div>
+                          <input className="input" style={{ height: 44 }} placeholder="Apellidos" value={datos.apellidos} onChange={e => setDatos(p => ({ ...p, apellidos: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email *</div>
+                          <input className="input" style={{ height: 44, borderColor: datos.email && !validarEmail(datos.email) ? '#EF4444' : undefined }}
+                            placeholder="email@ejemplo.com" value={datos.email} onChange={e => setDatos(p => ({ ...p, email: e.target.value }))} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Teléfono *</div>
+                          <input className="input" style={{ height: 44, borderColor: datos.telefono && !validarTel(datos.telefono) ? '#EF4444' : undefined }}
+                            placeholder="612 345 678" value={datos.telefono} onChange={e => setDatos(p => ({ ...p, telefono: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>IBAN — Cuenta para domiciliación *</div>
+                        <input className="input" style={{ height: 44, borderColor: datos.iban && !validarIBAN(datos.iban) ? '#EF4444' : undefined }}
+                          placeholder="ES91 2100 0418 4502 0005 1332" value={datos.iban}
+                          onChange={e => { setDatos(p => ({ ...p, iban: e.target.value.toUpperCase() })); setScoring(null) }}
+                        />
+                      </div>
+
+                      {/* Scoring — aparece solo cuando IBAN es válido */}
+                      {validarIBAN(datos.iban) && validarDNI(datos.dni) && datos.nombre.trim().length > 1 && datos.apellidos.trim().length > 1 && (
+                        <div style={{ marginTop: 4 }}>
+                          {clientePreCargado?.scoringOK ? (
+                            <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534', fontWeight: 600 }}>
+                              ✓ Scoring OK — Cliente verificado previamente
+                            </div>
+                          ) : (
+                            <button onClick={ejecutarScoring} disabled={scoringCargando}
+                              style={{ width: '100%', padding: '10px', background: scoring === true ? '#16A34A' : scoring === false ? '#DC2626' : BLUE, color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: scoringCargando ? 0.6 : 1 }}>
+                              {scoringCargando ? '⏳ Verificando scoring...' : scoring === true ? '✓ Scoring OK — Apto para contratar' : scoring === false ? '✕ Scoring KO — No apto' : '🔍 Ejecutar scoring de riesgo'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bloque: Datos adicionales */}
+                    <div style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Datos adicionales</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nacionalidad</div>
+                          <select className="input" style={{ height: 44 }} value={datos.nacionalidad} onChange={e => setDatos(p => ({ ...p, nacionalidad: e.target.value }))}>
+                            {['Española', 'Europea', 'Iberoamericana', 'Otra'].map(n => <option key={n}>{n}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Idioma</div>
+                          <select className="input" style={{ height: 44 }} value={datos.idioma} onChange={e => setDatos(p => ({ ...p, idioma: e.target.value }))}>
+                            {['Castellano', 'Catalán', 'Euskera', 'Gallego', 'Inglés'].map(i => <option key={i}>{i}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Formato de factura</div>
+                          <select className="input" style={{ height: 44 }} value={datos.formatoFactura || 'digital'} onChange={e => setDatos(p => ({ ...p, formatoFactura: e.target.value }))}>
+                            {['digital', 'papel', 'ambos'].map(f => <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Apoyo</div>
+                          <select className="input" style={{ height: 44 }} value={datos.apoyo || 'ninguno'} onChange={e => setDatos(p => ({ ...p, apoyo: e.target.value }))}>
+                            {['ninguno', 'visual', 'auditivo', 'cognitivo', 'movilidad'].map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input type="checkbox" id="vulnerable" checked={!!datos.vulnerable} onChange={e => setDatos(p => ({ ...p, vulnerable: e.target.checked }))}
+                          style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                        <label htmlFor="vulnerable" style={{ fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                          Cliente en situación de vulnerabilidad
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Bloque: Dirección de residencia habitual */}
+                    <div style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dirección de residencia habitual</div>
+                        {!editandoDireccionHabitual && (
+                          <button onClick={() => setEditandoDireccionHabitual(true)}
+                            style={{ fontSize: 12, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                            ✏ Editar
+                          </button>
+                        )}
+                      </div>
+                      {editandoDireccionHabitual ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <input className="input" style={{ height: 44 }} placeholder="Calle, número, piso, puerta..."
+                            value={datos.direccionHabitual || ''}
+                            onChange={e => setDatos(p => ({ ...p, direccionHabitual: e.target.value }))} />
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button onClick={() => setEditandoDireccionHabitual(false)}
+                              style={{ fontSize: 12, padding: '6px 14px', border: '1px solid #E5E7EB', borderRadius: 6, background: 'white', cursor: 'pointer', color: '#6B7280' }}>
+                              Cancelar
+                            </button>
+                            <button onClick={() => setEditandoDireccionHabitual(false)}
+                              style={{ fontSize: 12, padding: '6px 14px', border: 'none', borderRadius: 6, background: BLUE, color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+                              Confirmar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, color: '#374151' }}>
+                          {datos.direccionHabitual ||
+                            (cob.calle ? `${cob.calle} ${cob.numero}, ${cob.cp} ${cob.ciudad}`.trim() :
+                            <span style={{ color: '#9CA3AF' }}>Sin dirección — se precargará desde la cobertura</span>)}
+                        </div>
+                      )}
+                    </div>
+                </div>
 
                 {scoring === false && (
                   <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#991B1B', marginTop: 8 }}>
@@ -1237,13 +1358,17 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                   <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Selecciona la fecha y franja horaria de instalación con técnico.</div>
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Fecha</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                       {fechasDisponibles.map(f => (
                         <button key={f.val} onClick={() => setProv(p => ({ ...p, citaFecha: f.val }))}
                           style={{ padding: '8px 16px', fontSize: 12, border: `2px solid ${prov.citaFecha === f.val ? BLUE : '#E5E7EB'}`, borderRadius: 8, background: 'white', color: prov.citaFecha === f.val ? BLUE : '#374151', cursor: 'pointer', fontWeight: prov.citaFecha === f.val ? 600 : 400 }}>
                           {f.label}
                         </button>
                       ))}
+                      <button onClick={() => setMostrarCalendario(true)}
+                        style={{ padding: '8px 14px', fontSize: 12, border: '1.5px dashed #D1D5DB', borderRadius: 8, background: 'white', color: '#6B7280', cursor: 'pointer' }}>
+                        📆 Más fechas
+                      </button>
                     </div>
                   </div>
                   <div>
@@ -1279,6 +1404,16 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                       </div>
                     ))}
                   </div>
+                  {prov.sim === 'fisica' && (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>ICC de la SIM <span style={{ fontWeight: 400, color: '#9CA3AF' }}>(opcional)</span></div>
+                      <input className="input" style={{ height: 44, fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                        placeholder="8934..."
+                        value={iccSim}
+                        onChange={e => setIccSim(e.target.value.replace(/\D/g, '').slice(0, 20))} />
+                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 3 }}>Número de 19-20 dígitos impreso en la tarjeta SIM</div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1295,6 +1430,68 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                     </div>
                   ))}
                 </div>
+                {prov.entrega === 'domicilio' && (
+                  <div style={{ marginTop: 16, borderTop: '1px solid #E5E7EB', paddingTop: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Dirección de envío</div>
+                      {!editandoDireccionEnvio && (
+                        <button onClick={() => setEditandoDireccionEnvio(true)}
+                          style={{ fontSize: 12, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                          ✏ Editar
+                        </button>
+                      )}
+                    </div>
+                    {editandoDireccionEnvio ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input className="input" style={{ height: 44 }} placeholder="Calle, número, piso, puerta..."
+                          value={direccionEnvio}
+                          onChange={e => setDireccionEnvio(e.target.value)} />
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button onClick={() => setEditandoDireccionEnvio(false)}
+                            style={{ fontSize: 12, padding: '6px 14px', border: '1px solid #E5E7EB', borderRadius: 6, background: 'white', cursor: 'pointer', color: '#6B7280' }}>
+                            Cancelar
+                          </button>
+                          <button onClick={() => setEditandoDireccionEnvio(false)}
+                            style={{ fontSize: 12, padding: '6px 14px', border: 'none', borderRadius: 6, background: BLUE, color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+                            Confirmar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Artículos a enviar */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Artículos incluidos en el envío</div>
+                          {prov.sim === 'fisica' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, color: '#374151' }}>
+                              💳 SIM física
+                            </div>
+                          )}
+                          {prov.sim === 'esim' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, color: '#374151' }}>
+                              📲 eSIM — se enviará QR de activación por email a {datos.email || '—'}
+                            </div>
+                          )}
+                          {dispositivoSel && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, color: '#374151' }}>
+                              {dispositivoSel.imagen} {dispositivoSel.marca} {dispositivoSel.modelo} · {dispositivoSel.storage}
+                            </div>
+                          )}
+                          {!prov.sim && !dispositivoSel && (
+                            <div style={{ fontSize: 12, color: '#9CA3AF' }}>Sin artículos seleccionados aún</div>
+                          )}
+                        </div>
+
+                        {/* Dirección de envío */}
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Dirección de envío</div>
+                        <div style={{ fontSize: 13, color: '#374151' }}>
+                          {direccionEnvio || datos.direccionHabitual ||
+                            (cob.calle ? `${cob.calle} ${cob.numero}, ${cob.cp} ${cob.ciudad}`.trim() : '')}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1309,6 +1506,38 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
             </div>
 
             <ResumenLateral />
+          </div>
+        )}
+
+        {/* Modal calendario fechas adicionales */}
+        {mostrarCalendario && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setMostrarCalendario(false)}>
+            <div style={{ background: 'white', borderRadius: 14, padding: '28px', width: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>📆 Seleccionar fecha</div>
+                <button onClick={() => setMostrarCalendario(false)}
+                  style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9CA3AF', lineHeight: 1 }}>✕</button>
+              </div>
+              <input type="date" className="input" style={{ height: 44, width: '100%', marginBottom: 16 }}
+                value={prov.citaFecha}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={e => setProv(p => ({ ...p, citaFecha: e.target.value }))} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Franja horaria</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                {franjas.map(f => (
+                  <button key={f} onClick={() => setProv(p => ({ ...p, citaFranja: f }))}
+                    style={{ padding: '10px 16px', fontSize: 13, border: `2px solid ${prov.citaFranja === f ? BLUE : '#E5E7EB'}`, borderRadius: 8, background: prov.citaFranja === f ? BLUE_LIGHT : 'white', color: prov.citaFranja === f ? BLUE : '#374151', cursor: 'pointer', fontWeight: prov.citaFranja === f ? 600 : 400, textAlign: 'left' }}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setMostrarCalendario(false)} disabled={!prov.citaFecha || !prov.citaFranja}
+                style={{ width: '100%', padding: '12px', background: prov.citaFecha && prov.citaFranja ? BLUE : '#9CA3AF', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: prov.citaFecha && prov.citaFranja ? 'pointer' : 'not-allowed' }}>
+                Confirmar cita
+              </button>
+            </div>
           </div>
         )}
 
@@ -1411,6 +1640,59 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
               <button onClick={() => setModalAbierto(false)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #E5E7EB', background: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
 
+            {/* Si no hay DNI válido o DNI acaba en A (scoring KO), bloquear acceso al catálogo */}
+            {(!validarDNI(datos.dni) || datos.dni.toUpperCase().endsWith('A')) ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                <div style={{ maxWidth: 380, textAlign: 'center' }}>
+                  {validarDNI(datos.dni) && datos.dni.toUpperCase().endsWith('A') ? (
+                    <>
+                      <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#DC2626', marginBottom: 8 }}>
+                        Scoring KO — Cliente no apto
+                      </div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20, lineHeight: 1.6 }}>
+                        El cliente no puede acceder al escaparate de dispositivos. El scoring de riesgo ha resultado negativo.
+                      </div>
+                      <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 12, color: '#991B1B', fontWeight: 600 }}>
+                        ✕ No es posible financiar un terminal con este perfil de riesgo
+                      </div>
+                      <button onClick={() => setModalAbierto(false)}
+                        style={{ marginTop: 16, padding: '10px 24px', background: '#DC2626', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        Cerrar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 40, marginBottom: 16 }}>🪪</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
+                        Introduce el DNI del cliente
+                      </div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20, lineHeight: 1.6 }}>
+                        Necesario para verificar la financiación del terminal antes de mostrar el catálogo.
+                      </div>
+                      <input
+                        className="input"
+                        style={{ height: 48, textAlign: 'center', fontSize: 16, letterSpacing: '0.1em', marginBottom: 10 }}
+                        placeholder="12345678A"
+                        value={datos.dni}
+                        onChange={e => { setDatos(p => ({ ...p, dni: e.target.value.toUpperCase() })); setScoring(null) }}
+                        autoFocus
+                      />
+                      {datos.dni && !validarDNI(datos.dni) && (
+                        <div style={{ fontSize: 12, color: '#EF4444', marginBottom: 10 }}>
+                          Formato inválido — 8 dígitos + 1 letra
+                        </div>
+                      )}
+                      {validarDNI(datos.dni) && (
+                        <div style={{ fontSize: 12, color: '#16A34A', fontWeight: 600 }}>
+                          ✓ DNI válido — ya puedes ver los dispositivos
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
               {/* Filtros */}
               <div style={{ width: 220, borderRight: '1px solid #E5E7EB', padding: '20px', overflowY: 'auto', flexShrink: 0 }}>
@@ -1519,6 +1801,7 @@ export function NuevaVentaPage({ tipoForzado, clientePreCargado }: NuevaVentaPro
                 )}
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
