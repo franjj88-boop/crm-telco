@@ -281,7 +281,7 @@ export function FacturacionPage() {
   const facturaAnteriorAuto = factura
     ? facturasNormales.find(f =>
         f.id !== factura.id &&
-        (f as any).juridicaId === ((factura as any).juridicaId || 'A') &&
+        ((f as any).juridicaId || 'A') === ((factura as any).juridicaId || 'A') &&
         (() => {
           const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
           const [mesAct, anioAct] = factura.periodo.split(' ')
