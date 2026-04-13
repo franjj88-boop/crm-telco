@@ -191,8 +191,8 @@ export function FacturacionPage() {
   })
 
   const factura = facturaActiva
-    ? datos.facturas.find(f => f.id === facturaActiva) || datos.facturas[0]
-    : datos.facturas[0]
+    ? datos.facturas.find(f => f.id === facturaActiva) || facturasOrdenadas[0]
+    : facturasOrdenadas[0]
 
   const seleccionarFactura = (fid: string) => {
     if (fid === factura?.id) return
@@ -277,7 +277,7 @@ export function FacturacionPage() {
   const reclamacionFactura = factura ? reclamacionesPorFactura[factura.id] : null
 
   // Comparativa automática con factura anterior
-  const facturasNormales = datos.facturas.filter(f => !(f as any).esRectificativa)
+  const facturasNormales = facturasOrdenadas.filter(f => !(f as any).esRectificativa)
   const facturaAnteriorAuto = factura
     ? facturasNormales.find(f =>
         f.id !== factura.id &&
@@ -1073,15 +1073,19 @@ export function FacturacionPage() {
               const totalPaginas = Math.ceil(filtradas.length / FACTURAS_POR_PAGINA)
               const paginadas = filtradas.slice(paginaFacturas * FACTURAS_POR_PAGINA, (paginaFacturas + 1) * FACTURAS_POR_PAGINA)
               return <>
-                {paginadas.map((f, idx) => {
+                {paginadas.map((f) => {
                   const arr = filtradas.filter(f => !(f as any).esRectificativa)
+              const mismaJuridica = arr.filter(fj =>
+                ((fj as any).juridicaId || 'A') === ((f as any).juridicaId || 'A')
+              )
+              const idxMismaJuridica = mismaJuridica.indexOf(f)
+              const fAnterior = mismaJuridica[idxMismaJuridica + 1] || null
+              const deltaVsAnterior = fAnterior ? f.importe - fAnterior.importe : null
               const isActive = factura?.id === f.id
               const tieneAnomalos = f.conceptos.some(c => c.anomalo)
               const tieneReclamacion = !!reclamacionesPorFactura[f.id]
               const eventos = eventosPorFactura[f.id] || []
               const esRectificativa = f.esRectificativa === true
-              const fAnterior = arr[idx + 1]
-              const deltaVsAnterior = fAnterior ? f.importe - fAnterior.importe : null
               return (
                 <div key={f.id} onClick={() => modoEnvioMultiple ? (() => { const s = new Set(seleccionEnvio); s.has(f.id) ? s.delete(f.id) : s.add(f.id); setSeleccionEnvio(s) })() : seleccionarFactura(f.id)}
                   style={{ background: isActive ? 'var(--color-blue-light)' : esRectificativa ? 'var(--color-green-light)' : f.estado === 'vencida' ? 'var(--color-red-light)' : 'var(--color-background-primary)', border: `1px solid ${isActive ? 'var(--color-blue-mid)' : esRectificativa ? 'var(--color-green-border)' : f.estado === 'vencida' ? 'var(--color-red-border)' : 'var(--color-border-tertiary)'}`, borderLeft: `4px solid ${isActive ? 'var(--color-blue)' : esRectificativa ? 'var(--color-green-border)' : tieneReclamacion ? 'var(--color-red-mid)' : f.estado === 'pagada' ? 'var(--color-green-border)' : 'var(--color-amber-mid)'}`, borderRadius: 'var(--border-radius-lg)', padding: '12px 14px', cursor: 'pointer', transition: 'all 0.1s' }}>
